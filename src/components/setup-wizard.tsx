@@ -107,7 +107,10 @@ export function SetupWizard() {
     if (!token || !result) return;
     setStarring(true);
     try {
-      await starRepository(createGitHubRequest(token), dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo);
+      await Promise.all([
+        starRepository(createGitHubRequest(token), dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo),
+        starRepository(createGitHubRequest(token), "noVibe", "DnsConfUI")
+      ]);
       setStarred(true);
     } catch {
       setStarred(false);
