@@ -8,7 +8,8 @@ import {
   defaultDnsConfConfig,
   dnsConfConfigSchema,
   dnsConfWorkflow,
-  type DnsConfConfig
+  type DnsConfConfig,
+  type Profile
 } from "@/domain/dnsconf-config";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
 import { useAuth } from "./auth-provider";
@@ -184,7 +185,7 @@ function ProfilesSection({
   profileClientIdErrors,
   profileSecretErrors
 }: {
-  profiles: Array<{ clientId: string; authSecret: string; provider: string }>;
+  profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
@@ -192,21 +193,21 @@ function ProfilesSection({
   const [selected, setSelected] = useState(0);
 
   function update(index: number, field: "clientId" | "authSecret" | "provider", value: string) {
-    const next = [...profiles];
-    next[index] = { ...next[index], [field]: value };
+    const next = [...profiles] as DnsConfConfig["profiles"];
+    (next[index] as Record<string, string>)[field] = value;
     setValue("profiles", next, { shouldDirty: true, shouldValidate: true });
   }
 
   function remove(index: number) {
     const next = profiles.filter((_, i) => i !== index);
-    setValue("profiles", next.length ? next : [{ clientId: "", authSecret: "", provider: "" }], { shouldDirty: true, shouldValidate: true });
+    setValue("profiles", next.length ? (next as DnsConfConfig["profiles"]) : [{ clientId: "", authSecret: "", provider: "" }], { shouldDirty: true, shouldValidate: true });
     if (selected >= next.length) {
       setSelected(Math.max(0, next.length - 1));
     }
   }
 
   function add() {
-    setValue("profiles", [...profiles, { clientId: "", authSecret: "", provider: "" }], { shouldDirty: true, shouldValidate: true });
+    setValue("profiles", [...profiles, { clientId: "", authSecret: "", provider: "" }] as DnsConfConfig["profiles"], { shouldDirty: true, shouldValidate: true });
     setSelected(profiles.length);
   }
 
@@ -491,7 +492,11 @@ function ProvisionPanel({
   disabled,
   starred,
   starring,
-  onStar
+  onStar,
+  syncing,
+  synced,
+  needsSync,
+  onSync
 }: {
   status: "idle" | "running" | "done" | "error";
   message: string;
@@ -579,7 +584,7 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function fieldError(parsed: { success: boolean; error?: { issues: Array<{ path: (string | number)[]; message: string }> } }, field: string): string | undefined {
+function fieldError(parsed: { success: boolean; error?: { issues: Array<{ path: Array<string | number | symbol>; message: string }> } }, field: string): string | undefined {
   if (parsed.success || !parsed.error) return undefined;
   return parsed.error.issues.find(i => i.path[0] === field)?.message;
 }
