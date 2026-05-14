@@ -24,7 +24,8 @@ export function SetupWizard() {
   const [starring, setStarring] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(false);
-  const [needsSync, setNeedsSync] = useState(false);
+  const [needsSync, setNeedsSync] = useState<boolean | null>(null);
+  const [userLogin, setUserLogin] = useState<string | null>(null);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
   const normalizedValues = normalizeValues(values);
@@ -67,10 +68,14 @@ export function SetupWizard() {
   }, [clientIdsJson, form.setValue]);
 
   useEffect(() => {
-    if (!token || !result) return;
-    if (synced) return;
-    isForkBehind(createGitHubRequest(token), result.repository.owner, result.repository.repo, dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo).then(setNeedsSync);
-  }, [token, result, synced]);
+    if (!token || synced) return;
+    const req = createGitHubRequest(token);
+    req("GET /user").then((r: unknown) => {
+      const login = (r as { data: { login: string } }).data.login;
+      setUserLogin(login);
+      return isForkBehind(req, login, dnsConfWorkflow.sourceRepo, dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo);
+    }).then(setNeedsSync).catch(() => setNeedsSync(false));
+  }, [token, synced]);
 
   async function provision() {
     const parsedConfig = dnsConfConfigSchema.safeParse(normalizeValues(values));
@@ -112,11 +117,12 @@ export function SetupWizard() {
   }
 
   async function handleSync() {
-    if (!token || !result) return;
+    if (!token || !userLogin) return;
     setSyncing(true);
     try {
-      await syncFork(createGitHubRequest(token), result.repository.owner, result.repository.repo);
+      await syncFork(createGitHubRequest(token), userLogin, dnsConfWorkflow.sourceRepo);
       setSynced(true);
+      setNeedsSync(false);
     } catch {
       setSynced(false);
     } finally {
@@ -508,7 +514,7 @@ function ProvisionPanel({
   onStar: () => Promise<void>;
   syncing: boolean;
   synced: boolean;
-  needsSync: boolean;
+  needsSync: boolean | null;
   onSync: () => Promise<void>;
 }) {
   return (
@@ -517,6 +523,18 @@ function ProvisionPanel({
       <p className="mt-2 text-sm leading-6 text-ink/72">
         The browser will configure your DnsConf fork and dispatch `github_action.yml` on `main` branch.
       </p>
+      {needsSync && status === "idle" ? (
+        <button
+          type="button"
+          onClick={onSync}
+          disabled={synced || syncing}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-moss/40 bg-white px-3 py-2 text-sm font-medium text-moss transition hover:bg-moss/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <GitBranch className="size-4" aria-hidden="true" />
+          {syncing ? "Syncing…" : synced ? "Synced!" : "Sync fork"}
+        </button>
+      ) : null}
+
       <Button className="mt-4 w-full" onClick={onProvision} disabled={disabled}>
         {status === "running" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
