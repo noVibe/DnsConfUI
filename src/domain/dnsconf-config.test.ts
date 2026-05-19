@@ -6,11 +6,11 @@ import {
 } from "./dnsconf-config";
 
 const validConfig = {
-  profiles: [{ clientId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", authSecret: "secret-token", provider: "cloudflare" }],
+  profiles: [{ clientId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", authSecret: "secret-token", provider: "cloudflare" as const }],
   blocklists: ["https://example.com/block.txt", "https://filters.test/list"],
   redirects: ["https://example.com/redirect-hosts.txt"],
   redirectExclusions: ["keep.example"]
-} as const;
+};
 
 describe("dnsConfConfigSchema", () => {
   it("accepts the minimum valid Cloudflare configuration", () => {

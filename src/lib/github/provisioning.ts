@@ -6,6 +6,8 @@ type Request = (route: string, parameters?: Record<string, unknown>) => Promise<
 
 type EncryptSecret = (value: string, publicKey: string) => Promise<string>;
 
+export type ProvisionStep = "fork" | "secrets" | "dispatch";
+
 export type ProvisionDnsConfInput = {
   sourceOwner: string;
   sourceRepo: string;
@@ -13,6 +15,7 @@ export type ProvisionDnsConfInput = {
   payload: DnsConfPayload;
   request: Request;
   encryptSecret?: EncryptSecret;
+  onStep?: (step: ProvisionStep) => Promise<void> | void;
 };
 
 export type ProvisionResult = {
@@ -21,6 +24,7 @@ export type ProvisionResult = {
     repo: string;
   };
   workflowRunUrl?: string;
+  workflowRunId?: number;
 };
 
 type RepoResponse = {
@@ -49,10 +53,12 @@ export async function provisionDnsConfRepository({
   workflowFileName,
   payload,
   request,
-  encryptSecret = encryptGitHubSecret
+  encryptSecret = encryptGitHubSecret,
+  onStep
 }: ProvisionDnsConfInput): Promise<ProvisionResult> {
   const user = await getAuthenticatedUser(request);
   const { owner, repo } = await ensureFork(request, sourceOwner, sourceRepo, user);
+  await onStep?.("fork");
 
   const publicKey = await request("GET /repos/{owner}/{repo}/actions/secrets/public-key", {
     owner,
@@ -81,6 +87,7 @@ export async function provisionDnsConfRepository({
   }
 
   await enableActionsIfDisabled(request, owner, repo);
+  await onStep?.("secrets");
 
   await request("PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable", {
     owner,
@@ -95,9 +102,15 @@ export async function provisionDnsConfRepository({
     ref: "main"
   });
 
-  const workflowRunUrl = await fetchWorkflowRunUrl(request, owner, repo, workflowFileName);
+  const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(request, owner, repo, workflowFileName);
 
-  return { repository: { owner, repo }, workflowRunUrl };
+  if (workflowRunId) {
+    await waitForWorkflowRunCompletion(request, owner, repo, workflowRunId);
+  }
+
+  await onStep?.("dispatch");
+
+  return { repository: { owner, repo }, workflowRunUrl, workflowRunId };
 }
 
 async function getAuthenticatedUser(request: Request): Promise<string> {
@@ -205,12 +218,12 @@ async function upsertVariable(
 const DISPATCH_POLL_RETRIES = 10;
 const DISPATCH_POLL_INTERVAL_MS = 2000;
 
-async function fetchWorkflowRunUrl(
+async function fetchWorkflowRun(
   request: Request,
   owner: string,
   repo: string,
   workflowFileName: string
-): Promise<string | undefined> {
+): Promise<{ workflowRunUrl?: string; workflowRunId?: number }> {
   for (let i = 0; i < DISPATCH_POLL_RETRIES; i++) {
     try {
       const response = await request(
@@ -220,14 +233,46 @@ async function fetchWorkflowRunUrl(
       const data = response.data as { workflow_runs?: Array<{ id: number; html_url?: string }> };
       const run = data.workflow_runs?.[0];
       if (run?.html_url) {
-        return run.html_url;
+        return { workflowRunUrl: run.html_url, workflowRunId: run.id };
       }
     } catch {
       // retry
     }
     await sleep(DISPATCH_POLL_INTERVAL_MS);
   }
-  return undefined;
+  return {};
+}
+
+const WORKFLOW_COMPLETION_RETRIES = 300;
+const WORKFLOW_COMPLETION_INTERVAL_MS = 10000;
+
+async function waitForWorkflowRunCompletion(
+  request: Request,
+  owner: string,
+  repo: string,
+  runId: number
+): Promise<void> {
+  for (let i = 0; i < WORKFLOW_COMPLETION_RETRIES; i++) {
+    try {
+      const response = await request("GET /repos/{owner}/{repo}/actions/runs/{run_id}", {
+        owner,
+        repo,
+        run_id: runId
+      });
+      const data = response.data as { status?: string; conclusion?: string };
+      if (data.status === "completed") {
+        if (data.conclusion === "success") return;
+        throw new Error(`Workflow run finished with conclusion: ${data.conclusion}`);
+      }
+    } catch (error) {
+      // re-throw if it's a provisioning error, retry on network issues
+      if (error instanceof Error && error.message.startsWith("Workflow run")) {
+        throw error;
+      }
+    }
+    await sleep(WORKFLOW_COMPLETION_INTERVAL_MS);
+  }
+  // Timeout — still mark as done (the workflow might still be running)
 }
 
 async function enableActionsIfDisabled(request: Request, owner: string, repo: string): Promise<void> {

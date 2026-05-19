@@ -11,9 +11,11 @@ import {
   type DnsConfConfig,
   type Profile
 } from "@/domain/dnsconf-config";
+import { GEOBLOCK_HOSTS_URL, ADBLOCK_HOSTS_URL, OISD_SMALL_URL } from "@/domain/toggles";
+import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
 import { useAuth } from "./auth-provider";
-import { Button, Field, SecondaryButton, inputClass, textareaClass } from "./ui";
+import { Button, cn, Field, SecondaryButton, inputClass, textareaClass } from "./ui";
 
 export function SetupWizard() {
   const { token, setToken } = useAuth();
@@ -26,11 +28,166 @@ export function SetupWizard() {
   const [synced, setSynced] = useState(false);
   const [needsSync, setNeedsSync] = useState<boolean | null>(null);
   const [userLogin, setUserLogin] = useState<string | null>(null);
+  const [mode, setMode] = useState<"quick" | "expert">("quick");
+  const [geoBlock, setGeoBlock] = useState(true);
+  const [geoHideChecked, setGeoHideChecked] = useState(true);
+  const [malwChecked, setMalwChecked] = useState(true);
+  const [blockAds, setBlockAds] = useState(true);
+  const [disguisedTrackers, setDisguisedTrackers] = useState(true);
+  const [nativeTracking, setNativeTracking] = useState(true);
+  const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
   const normalizedValues = normalizeValues(values);
   const parsed = dnsConfConfigSchema.safeParse(normalizedValues);
   const payload = useMemo(() => (parsed.success ? buildDnsConfPayload(parsed.data) : null), [parsed]);
+
+  const hasToggles = geoBlock || blockAds || disguisedTrackers || nativeTracking;
+
+  const canQuickProvision = useMemo(() => {
+    const profiles = values.profiles ?? [];
+    if (profiles.length === 0) return false;
+    const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
+    return allFilled && hasToggles && !!profiles[0]?.provider;
+  }, [values.profiles, hasToggles]);
+
+  async function quickProvision() {
+    if (!token) return;
+    const profiles = values.profiles ?? [];
+    const provider = profiles[0]?.provider;
+
+    if (!provider) {
+      setStatus("error");
+      setMessage("Could not determine DNS provider. Check CLIENT_ID.");
+      return;
+    }
+
+    if (profiles.length === 0 || !profiles.every(p => p.clientId && p.authSecret)) {
+      setStatus("error");
+      setMessage("Fill in all profile credentials.");
+      return;
+    }
+
+    if (!geoBlock && !blockAds && !disguisedTrackers && !nativeTracking) {
+      setStatus("error");
+      setMessage("Enable at least one feature.");
+      return;
+    }
+
+    if (!profiles.every(p => p.provider === provider)) {
+      setStatus("error");
+      setMessage("All profiles must use the same DNS provider in Quick mode.");
+      return;
+    }
+
+    const steps: { id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[] = [];
+
+    if (provider === "nextdns") {
+      if (blockAds || disguisedTrackers) {
+        steps.push({ id: "blocklists", label: "Block ads & disguised trackers", status: "pending" });
+      }
+      if (nativeTracking) {
+        steps.push({ id: "natives", label: "Native tracking protection", status: "pending" });
+      }
+    }
+
+    if (geoBlock) {
+      steps.push({ id: "hosts", label: "Geo-blocking hosts", status: "pending" });
+    }
+
+    steps.push({ id: "fork", label: "Fork repository", status: "pending" });
+    steps.push({ id: "secrets", label: "Secrets & variables", status: "pending" });
+    steps.push({ id: "dispatch", label: "Run workflow", status: "pending" });
+
+    setQuickSteps(steps);
+    setStatus("running");
+    setMessage("");
+
+    try {
+      if (provider === "nextdns") {
+        if (blockAds || disguisedTrackers) {
+          setQuickSteps(prev => prev.map(s => s.id === "blocklists" ? { ...s, status: "running" } : s));
+          for (const profile of profiles) {
+            const result = await configureNextDNSProfile(
+              profile.clientId, profile.authSecret,
+              blockAds, false, disguisedTrackers
+            );
+            if (!result.success) {
+              throw new Error(`Profile ${profile.clientId}: ${result.error}`);
+            }
+          }
+          setQuickSteps(prev => prev.map(s => s.id === "blocklists" ? { ...s, status: "done" } : s));
+        }
+
+        if (nativeTracking) {
+          setQuickSteps(prev => prev.map(s => s.id === "natives" ? { ...s, status: "running" } : s));
+          for (const profile of profiles) {
+            const result = await configureNextDNSProfile(
+              profile.clientId, profile.authSecret,
+              false, true, false
+            );
+            if (!result.success) {
+              throw new Error(`Profile ${profile.clientId}: ${result.error}`);
+            }
+          }
+          setQuickSteps(prev => prev.map(s => s.id === "natives" ? { ...s, status: "done" } : s));
+        }
+      }
+
+      const blockUrls: string[] = [];
+      const redirectUrls: string[] = [];
+      if (geoBlock && geoHideChecked) {
+        if (provider === "cloudflare") blockUrls.push(GEOBLOCK_HOSTS_URL);
+        redirectUrls.push(GEOBLOCK_HOSTS_URL);
+      }
+      if (geoBlock && malwChecked) {
+        if (provider === "cloudflare") blockUrls.push(ADBLOCK_HOSTS_URL);
+        redirectUrls.push(ADBLOCK_HOSTS_URL);
+      }
+      if (blockAds && provider === "cloudflare") {
+        if (!blockUrls.includes(GEOBLOCK_HOSTS_URL)) blockUrls.push(GEOBLOCK_HOSTS_URL);
+        if (!blockUrls.includes(ADBLOCK_HOSTS_URL)) blockUrls.push(ADBLOCK_HOSTS_URL);
+        if (!blockUrls.includes(OISD_SMALL_URL)) blockUrls.push(OISD_SMALL_URL);
+      }
+
+      if (redirectUrls.length > 0) {
+        setQuickSteps(prev => prev.map(s => s.id === "hosts" ? { ...s, status: "done" } : s));
+      }
+
+      const config: DnsConfConfig = {
+        profiles: profiles as DnsConfConfig["profiles"],
+        blocklists: blockUrls,
+        redirects: redirectUrls,
+        redirectExclusions: []
+      };
+
+      setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "running" } : s));
+
+      const provisionResult = await provisionDnsConfRepository({
+        ...dnsConfWorkflow,
+        payload: buildDnsConfPayload(config),
+        request: createGitHubRequest(token),
+        onStep: async (step) => {
+          if (step === "fork") {
+            setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
+            setQuickSteps(prev => prev.map(s => s.id === "secrets" ? { ...s, status: "running" } : s));
+          } else if (step === "secrets") {
+            setQuickSteps(prev => prev.map(s => s.id === "secrets" ? { ...s, status: "done" } : s));
+            setQuickSteps(prev => prev.map(s => s.id === "dispatch" ? { ...s, status: "running" } : s));
+          } else if (step === "dispatch") {
+            setQuickSteps(prev => prev.map(s => s.id === "dispatch" ? { ...s, status: "done" } : s));
+          }
+        }
+      });
+
+      setResult(provisionResult);
+      setStatus("done");
+    } catch (error) {
+      setQuickSteps(prev => prev.map(s => s.status === "running" ? { ...s, status: "error" as const } : s));
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Provisioning failed.");
+    }
+  }
 
   const clientIdsJson = JSON.stringify((values.profiles ?? []).map(p => p.clientId));
   const prevClientIdsJson = useRef(clientIdsJson);
@@ -133,6 +290,10 @@ export function SetupWizard() {
     }
   }
 
+  const providerLabel = (values.profiles?.[0]?.provider ?? null) === "nextdns" ? "NextDNS"
+    : (values.profiles?.[0]?.provider ?? null) === "cloudflare" ? "Cloudflare"
+    : null;
+
   return (
     <section aria-labelledby="setup-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -147,33 +308,97 @@ export function SetupWizard() {
         <SecondaryButton onClick={() => setToken(null)}>Disconnect</SecondaryButton>
       </div>
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="space-y-5">
-          <ProfilesSection
+      <div className="mt-4 flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
+        <button
+          type="button"
+          onClick={() => setMode("quick")}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium transition",
+            mode === "quick"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink/60 hover:text-ink"
+          )}
+        >
+          Quick
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("expert")}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium transition",
+            mode === "expert"
+              ? "bg-white text-ink shadow-sm"
+              : "text-ink/60 hover:text-ink"
+          )}
+        >
+          Expert
+        </button>
+      </div>
+
+      {mode === "expert" ? (
+        <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-5">
+            <ProfilesSection
+              profiles={values.profiles ?? []}
+              setValue={form.setValue}
+              profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
+              profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
+            />
+            <SourcesSection
+              blocklists={values.blocklists}
+              redirects={values.redirects}
+              redirectExclusions={values.redirectExclusions}
+              setValue={form.setValue}
+              blocklistsError={fieldError(parsed, "blocklists")}
+              redirectsError={fieldError(parsed, "redirects")}
+              redirectExclusionsError={fieldError(parsed, "redirectExclusions")}
+            />
+          </div>
+
+          <aside className="space-y-5">
+            <ReviewPanel payload={payload} valid={parsed.success} />
+            <ProvisionPanel
+              status={status}
+              message={message}
+              result={result}
+              onProvision={provision}
+              disabled={!parsed.success || status === "running"}
+              starred={starred}
+              starring={starring}
+              onStar={handleStar}
+              syncing={syncing}
+              synced={synced}
+              needsSync={needsSync}
+              onSync={handleSync}
+            />
+          </aside>
+        </div>
+      ) : (
+        <div className="mt-6">
+          <QuickModeUI
             profiles={values.profiles ?? []}
+            providerLabel={providerLabel}
             setValue={form.setValue}
             profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
             profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
-          />
-          <SourcesSection
-            blocklists={values.blocklists}
-            redirects={values.redirects}
-            redirectExclusions={values.redirectExclusions}
-            setValue={form.setValue}
-            blocklistsError={fieldError(parsed, "blocklists")}
-            redirectsError={fieldError(parsed, "redirects")}
-            redirectExclusionsError={fieldError(parsed, "redirectExclusions")}
-          />
-        </div>
-
-        <aside className="space-y-5">
-          <ReviewPanel payload={payload} valid={parsed.success} />
-          <ProvisionPanel
+            geoBlock={geoBlock}
+            geoHideChecked={geoHideChecked}
+            malwChecked={malwChecked}
+            blockAds={blockAds}
+            disguisedTrackers={disguisedTrackers}
+            nativeTracking={nativeTracking}
+            onGeoBlockChange={setGeoBlock}
+            onGeoHideChange={setGeoHideChecked}
+            onMalwChange={setMalwChecked}
+            onBlockAdsChange={setBlockAds}
+            onDisguisedTrackersChange={setDisguisedTrackers}
+            onNativeTrackingChange={setNativeTracking}
+            quickSteps={quickSteps}
+            onProvision={quickProvision}
             status={status}
             message={message}
+            disabled={!canQuickProvision || status === "running"}
             result={result}
-            onProvision={provision}
-            disabled={!parsed.success || status === "running"}
             starred={starred}
             starring={starring}
             onStar={handleStar}
@@ -182,8 +407,8 @@ export function SetupWizard() {
             needsSync={needsSync}
             onSync={handleSync}
           />
-        </aside>
-      </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -192,19 +417,65 @@ function ProfilesSection({
   profiles,
   setValue,
   profileClientIdErrors,
-  profileSecretErrors
+  profileSecretErrors,
+  simplified
 }: {
   profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  simplified?: boolean;
 }) {
   const [selected, setSelected] = useState(0);
+  const [credStatus, setCredStatus] = useState<Record<number, { status: "idle" | "validating" | "valid" | "invalid"; message?: string }>>({});
+  const validateTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => () => { Object.values(validateTimers.current).forEach(clearTimeout); }, []);
+
+  useEffect(() => {
+    if (!simplified) return;
+    const p = profiles[selected];
+    const detected = p?.clientId?.length === 32 ? "cloudflare" : p?.clientId?.length === 6 ? "nextdns" : null;
+    if (!detected || !p?.authSecret?.trim() || credStatus[selected]) return;
+    const timer = setTimeout(async () => {
+      setCredStatus(prev => ({ ...prev, [selected]: { status: "validating" } }));
+      const result = await validateCredentials(p.clientId, p.authSecret, detected);
+      setCredStatus(prev => ({
+        ...prev,
+        [selected]: result.valid
+          ? { status: "valid" }
+          : { status: "invalid", message: result.error }
+      }));
+    }, 1000);
+    validateTimers.current[selected] = timer;
+  }, [selected, simplified]);
 
   function update(index: number, field: "clientId" | "authSecret" | "provider", value: string) {
-    const next = [...profiles] as DnsConfConfig["profiles"];
-    (next[index] as Record<string, string>)[field] = value;
+    const next = profiles.map((p, i) =>
+      i === index ? { ...p, [field]: value } : p
+    ) as DnsConfConfig["profiles"];
     setValue("profiles", next, { shouldDirty: true, shouldValidate: true });
+
+    if (!simplified) return;
+    if (field !== "clientId" && field !== "authSecret") return;
+
+    const timer = validateTimers.current[index];
+    if (timer) clearTimeout(timer);
+
+    const p = next[index];
+    const len = p?.clientId?.length ?? 0;
+    const detected = len === 32 ? "cloudflare" : len === 6 ? "nextdns" : null;
+    if (!detected || !p?.authSecret?.trim()) return;
+
+    validateTimers.current[index] = setTimeout(async () => {
+      setCredStatus(prev => ({ ...prev, [index]: { status: "validating" } }));
+      const result = await validateCredentials(p.clientId, p.authSecret, detected);
+      setCredStatus(prev => ({
+        ...prev,
+        [index]: result.valid
+          ? { status: "valid" }
+          : { status: "invalid", message: result.error }
+      }));
+    }, 1000);
   }
 
   function remove(index: number) {
@@ -244,6 +515,7 @@ function ProfilesSection({
           Add profile
         </button>
       </div>
+
       {profiles[selected] ? (
         <div className="space-y-3 rounded-md border border-line bg-white p-3">
           <div className="flex items-start justify-between gap-2">
@@ -263,17 +535,46 @@ function ProfilesSection({
           <Field label={<span>AUTH_SECRET <span className="text-coral">*</span></span>} error={profileSecretErrors?.find(e => e.index === selected)?.message}>
             <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
           </Field>
+          {simplified && credStatus[selected] ? (
+            <div className="flex items-start gap-2 text-sm">
+              {credStatus[selected].status === "validating" ? (
+                <Loader2 className="mt-0.5 size-4 animate-spin text-moss shrink-0" aria-hidden="true" />
+              ) : credStatus[selected].status === "valid" ? (
+                <CheckCircle2 className="mt-0.5 size-4 text-moss shrink-0" aria-hidden="true" />
+              ) : credStatus[selected].status === "invalid" ? (
+                <X className="mt-0.5 size-4 text-coral shrink-0" aria-hidden="true" />
+              ) : null}
+              <span className={
+                credStatus[selected].status === "invalid" ? "text-coral" : "text-moss"
+              }>
+                {credStatus[selected].status === "validating" ? "Checking credentials…" :
+                 credStatus[selected].status === "valid" ? "Credentials verified" :
+                 credStatus[selected].status === "invalid" ? credStatus[selected].message ?? "Invalid credentials" :
+                 null}
+              </span>
+            </div>
+          ) : null}
           {profiles[selected].provider ? (
             <div>
-              <div className="text-sm text-moss">DNS: {profiles[selected].provider === "cloudflare" ? "Cloudflare" : "NextDNS"}</div>
-              <ScriptBehaviour provider={profiles[selected].provider as "cloudflare" | "nextdns"} />
+              {simplified ? (
+                <div className="text-sm font-medium text-moss">
+                  DNS: {profiles[selected].provider === "cloudflare" ? "Cloudflare" : "NextDNS"}
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm text-moss">DNS: {profiles[selected].provider === "cloudflare" ? "Cloudflare" : "NextDNS"}</div>
+                  <ScriptBehaviour provider={profiles[selected].provider as "cloudflare" | "nextdns"} />
+                </>
+              )}
             </div>
           ) : null}
         </div>
       ) : null}
-      <p className="text-sm leading-6 text-ink/70">
-        Each profile is a separate DNS configuration. Profiles share the same BLOCK and REDIRECT sources.
-      </p>
+      {!simplified ? (
+        <p className="text-sm leading-6 text-ink/70">
+          Each profile is a separate DNS configuration. Profiles share the same BLOCK and REDIRECT sources.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -524,7 +825,7 @@ function ProvisionPanel({
     <section className="rounded-lg border border-line bg-paper p-4">
       <h3 className="font-semibold text-ink">Provision GitHub</h3>
       <p className="mt-2 text-sm leading-6 text-ink/72">
-        The browser will configure your DnsConf fork and dispatch `github_action.yml` on `main` branch.
+        Apply DNS provider settings via API and provision your DnsConf fork on GitHub.
       </p>
       {needsSync && status === "idle" ? (
         <button
@@ -544,7 +845,7 @@ function ProvisionPanel({
         ) : (
           <Play className="size-4" aria-hidden="true" />
         )}
-        {status === "running" ? "Provisioning" : "Provision repository"}
+        {status === "running" ? "Applying…" : "Apply configuration"}
       </Button>
 
       {status === "done" && result ? (
@@ -593,6 +894,245 @@ function ProvisionPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  tooltip,
+  children
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  tooltip?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-white p-4 transition hover:border-steel">
+      <div className="relative mt-0.5 shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer sr-only"
+        />
+        <div className="h-5 w-9 rounded-full bg-line transition peer-checked:bg-moss" />
+        <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4" />
+      </div>
+      <div className="flex flex-1 items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-ink">{label}</span>
+          {tooltip ? (
+            <span className="group relative inline-flex">
+              <Info className="size-3.5 text-ink/40" />
+              <div className="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-2 text-xs text-ink/80 opacity-0 shadow-sm transition-all delay-150 duration-150 group-hover:visible group-hover:opacity-100">
+                {tooltip}
+              </div>
+            </span>
+          ) : null}
+        </div>
+        {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
+      </div>
+    </label>
+  );
+}
+
+function QuickModeUI({
+  profiles,
+  providerLabel,
+  setValue,
+  profileClientIdErrors,
+  profileSecretErrors,
+  geoBlock,
+  geoHideChecked,
+  malwChecked,
+  blockAds,
+  disguisedTrackers,
+  nativeTracking,
+  onGeoBlockChange,
+  onGeoHideChange,
+  onMalwChange,
+  onBlockAdsChange,
+  onDisguisedTrackersChange,
+  onNativeTrackingChange,
+  onProvision,
+  status,
+  message,
+  disabled,
+  quickSteps,
+  result,
+  starred,
+  starring,
+  onStar,
+  syncing,
+  synced,
+  needsSync,
+  onSync
+}: {
+  profiles: DnsConfConfig["profiles"];
+  providerLabel: string | null;
+  setValue: UseFormSetValue<DnsConfConfig>;
+  profileClientIdErrors?: Array<{ index: number; message: string }>;
+  profileSecretErrors?: Array<{ index: number; message: string }>;
+  geoBlock: boolean;
+  geoHideChecked: boolean;
+  malwChecked: boolean;
+  blockAds: boolean;
+  disguisedTrackers: boolean;
+  nativeTracking: boolean;
+  onGeoBlockChange: (v: boolean) => void;
+  onGeoHideChange: (v: boolean) => void;
+  onMalwChange: (v: boolean) => void;
+  onBlockAdsChange: (v: boolean) => void;
+  onDisguisedTrackersChange: (v: boolean) => void;
+  onNativeTrackingChange: (v: boolean) => void;
+  onProvision: () => void;
+  status: "idle" | "running" | "done" | "error";
+  message: string;
+  disabled: boolean;
+  quickSteps: Array<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }>;
+  result: ProvisionResult | null;
+  starred: boolean;
+  starring: boolean;
+  onStar: () => Promise<void>;
+  syncing: boolean;
+  synced: boolean;
+  needsSync: boolean | null;
+  onSync: () => Promise<void>;
+}) {
+  const isNextDNS = providerLabel === "NextDNS";
+  const noToggles = !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking;
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="space-y-5">
+         <ProfilesSection
+            profiles={profiles}
+            setValue={setValue}
+            profileClientIdErrors={profileClientIdErrors}
+            profileSecretErrors={profileSecretErrors}
+            simplified
+          />
+
+        {providerLabel ? (
+          <section className="space-y-3 rounded-lg border border-line bg-paper p-4">
+            <span className="text-sm font-medium text-ink">Features</span>
+
+            <ToggleSwitch
+              checked={geoBlock}
+              onChange={onGeoBlockChange}
+              label="Bypass geo-blocking"
+              tooltip="Prevent DNS-based geo-restrictions using curated hosts filters."
+            >
+              {geoBlock ? (
+                <div className="flex items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
+                    <input
+                      type="checkbox"
+                      checked={geoHideChecked}
+                      onChange={(e) => onGeoHideChange(e.target.checked)}
+                      className="size-3 accent-moss"
+                    />
+                    <span>GeoHide</span>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
+                    <input
+                      type="checkbox"
+                      checked={malwChecked}
+                      onChange={(e) => onMalwChange(e.target.checked)}
+                      className="size-3 accent-moss"
+                    />
+                    <span>Malw</span>
+                  </label>
+                </div>
+              ) : null}
+            </ToggleSwitch>
+
+            <ToggleSwitch
+              checked={blockAds}
+              onChange={onBlockAdsChange}
+              label="Block ads &amp; trackers"
+              tooltip={
+                isNextDNS
+                  ? "Activate blocklists: NextDNS Recommended, OISD, AdGuard Russian, AdGuard DNS."
+                  : "Add a hosts-based filter to block advertising and tracking domains."
+              }
+            />
+
+            {isNextDNS ? (
+              <ToggleSwitch
+                checked={disguisedTrackers}
+                onChange={onDisguisedTrackersChange}
+                label="Block Disguised Third-Party Trackers"
+                tooltip="Prevent trackers that disguise as first-party content. Configured via NextDNS API."
+              />
+            ) : null}
+
+            {isNextDNS ? (
+              <ToggleSwitch
+                checked={nativeTracking}
+                onChange={onNativeTrackingChange}
+                label="Native Tracking Protection"
+                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku. Configured via NextDNS API."
+              />
+            ) : null}
+
+            {noToggles && status === "idle" ? (
+              <p className="text-sm leading-5 text-coral">Enable at least one feature.</p>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+
+      <aside className="space-y-5">
+        {status !== "idle" ? (
+          <section className="rounded-lg border border-line bg-paper p-4">
+            <h3 className="text-sm font-semibold text-ink">Progress</h3>
+            <ul className="mt-3 space-y-2">
+              {quickSteps.map(step => (
+                <li key={step.id} className="flex items-center gap-2 text-sm">
+                  {step.status === "running" ? (
+                    <Loader2 className="size-4 animate-spin text-moss" aria-hidden="true" />
+                  ) : step.status === "done" ? (
+                    <CheckCircle2 className="size-4 text-moss" aria-hidden="true" />
+                  ) : step.status === "error" ? (
+                    <X className="size-4 text-coral" aria-hidden="true" />
+                  ) : step.status === "skipped" ? (
+                    <span className="size-4 rounded-full border-2 border-line" aria-hidden="true" />
+                  ) : (
+                    <span className="size-4 rounded-full border-2 border-line/40" aria-hidden="true" />
+                  )}
+                  <span className={
+                    step.status === "running" ? "text-ink font-medium" :
+                    step.status === "error" ? "text-coral" :
+                    "text-ink/60"
+                  }>
+                    {step.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        <ProvisionPanel
+          status={status}
+          message={message}
+          result={result}
+          onProvision={onProvision}
+          disabled={disabled}
+          starred={starred}
+          starring={starring}
+          onStar={onStar}
+          syncing={syncing}
+          synced={synced}
+          needsSync={needsSync}
+          onSync={onSync}
+        />
+      </aside>
+    </div>
   );
 }
 
