@@ -24,6 +24,9 @@ describe("provisionDnsConfRepository", () => {
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
         return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
       }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
       return { data: {} };
     });
     const encryptSecret = vi.fn(async (value: string) => `encrypted:${value}`);
@@ -89,6 +92,9 @@ describe("provisionDnsConfRepository", () => {
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
         return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
       }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
       return { data: {} };
     });
 
@@ -129,6 +135,9 @@ describe("provisionDnsConfRepository", () => {
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
         return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
       }
       if (
         route === "POST /repos/{owner}/{repo}/actions/variables" &&
@@ -183,6 +192,9 @@ describe("provisionDnsConfRepository", () => {
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
         return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
       }
       if (
         route === "POST /repos/{owner}/{repo}/actions/variables" &&
