@@ -167,6 +167,7 @@ export function SetupWizard() {
         ...dnsConfWorkflow,
         payload: buildDnsConfPayload(config),
         request: createGitHubRequest(token),
+        profileCount: config.profiles.length,
         onStep: async (step) => {
           if (step === "fork") {
             setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
@@ -250,7 +251,8 @@ export function SetupWizard() {
       const provisionResult = await provisionDnsConfRepository({
         ...dnsConfWorkflow,
         payload: buildDnsConfPayload(parsedConfig.data),
-        request: createGitHubRequest(token)
+        request: createGitHubRequest(token),
+        profileCount: parsedConfig.data.profiles.length
       });
       setResult(provisionResult);
       setStatus("done");
@@ -823,7 +825,6 @@ function ProvisionPanel({
 }) {
   return (
     <section className="rounded-lg border border-line bg-paper p-4">
-      <h3 className="font-semibold text-ink">Provision GitHub</h3>
       <p className="mt-2 text-sm leading-6 text-ink/72">
         Apply DNS provider settings via API and provision your DnsConf fork on GitHub.
       </p>
@@ -1076,7 +1077,7 @@ function QuickModeUI({
                 checked={nativeTracking}
                 onChange={onNativeTrackingChange}
                 label="Native Tracking Protection"
-                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku. Configured via NextDNS API."
+                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku, Alexa, Sonos. Configured via NextDNS API."
               />
             ) : null}
 

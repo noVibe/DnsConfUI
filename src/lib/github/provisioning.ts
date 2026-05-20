@@ -16,6 +16,7 @@ export type ProvisionDnsConfInput = {
   request: Request;
   encryptSecret?: EncryptSecret;
   onStep?: (step: ProvisionStep) => Promise<void> | void;
+  profileCount?: number;
 };
 
 export type ProvisionResult = {
@@ -54,7 +55,8 @@ export async function provisionDnsConfRepository({
   payload,
   request,
   encryptSecret = encryptGitHubSecret,
-  onStep
+  onStep,
+  profileCount = 1
 }: ProvisionDnsConfInput): Promise<ProvisionResult> {
   const user = await getAuthenticatedUser(request);
   const { owner, repo } = await ensureFork(request, sourceOwner, sourceRepo, user);
@@ -105,7 +107,7 @@ export async function provisionDnsConfRepository({
   const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(request, owner, repo, workflowFileName);
 
   if (workflowRunId) {
-    await waitForWorkflowRunCompletion(request, owner, repo, workflowRunId);
+    await waitForWorkflowRunCompletion(request, owner, repo, workflowRunId, profileCount);
   }
 
   await onStep?.("dispatch");
@@ -243,16 +245,17 @@ async function fetchWorkflowRun(
   return {};
 }
 
-const WORKFLOW_COMPLETION_RETRIES = 300;
 const WORKFLOW_COMPLETION_INTERVAL_MS = 10000;
 
 async function waitForWorkflowRunCompletion(
   request: Request,
   owner: string,
   repo: string,
-  runId: number
+  runId: number,
+  profileCount: number
 ): Promise<void> {
-  for (let i = 0; i < WORKFLOW_COMPLETION_RETRIES; i++) {
+  const maxRetries = 300 * profileCount;
+  for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await request("GET /repos/{owner}/{repo}/actions/runs/{run_id}", {
         owner,
