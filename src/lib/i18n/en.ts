@@ -1,6 +1,6 @@
 export const locale = {
   "home.title": "Quick setup for",
-  "home.description": "Connect GitHub, enter DNS provider settings, and let the browser configure DNS via API, provision a fork, repository secrets, variables, and the first workflow run.",
+  "home.description": "Bypass geo-blocking with nightly rule updates and block known ad & tracker domains from open-source data feeds.",
   "home.why": "Why this configurator exists",
   "home.whereCreds": "Where to get CLIENT_ID and AUTH_SECRET",
   "home.nextdns": "NextDNS",
@@ -25,15 +25,13 @@ export const locale = {
   "home.footer": "GitHub: noVibe/DnsConfUI",
 
   "points.quick.title": "Quick setup",
-  "points.quick.text": "Enter only credentials and pick features \u2014 geo-blocking bypass, tracker blocking, and ad blocking are configured automatically via presets.",
-  "points.fork.title": "Own fork",
-  "points.fork.text": "DnsConf runs in the user\u2019s GitHub account, with Actions and repository ownership staying there.",
+  "points.quick.text": "Enter credentials\u2014everything else is configured automatically.",
+  "points.fork.title": "Full control",
+  "points.fork.text": "Personal DnsConf fork on your GitHub; rules updated via GitHub Actions.",
   "points.nocred.title": "No stored credentials",
   "points.nocred.text": "Provider secrets are encrypted in the browser and sent directly to GitHub Actions Secrets.",
-  "points.workflow.title": "Workflow-native",
-  "points.workflow.text": "The current DnsConf workflow receives DNS, BLOCK, REDIRECT, CLIENT_ID, and AUTH_SECRET.",
-  "points.run.title": "One initial run",
-  "points.run.text": "After provisioning, the UI dispatches the GitHub Actions workflow immediately.",
+  "points.run.title": "Set and forget",
+  "points.run.text": "Geo-blocking, ad, and tracker rule updates run every night via GitHub Actions.",
 
   "wizard.setup": "Environment setup",
   "wizard.setupDesc": "Setup the DnsConf GitHub Actions secrets and variables in one pass.",

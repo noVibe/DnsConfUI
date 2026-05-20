@@ -2,7 +2,7 @@ import type { LocaleKey } from "./en";
 
 export const locale: Record<LocaleKey, string> = {
   "home.title": "Быстрая настройка",
-  "home.description": "Подключите GitHub, укажите настройки DNS-провайдера, и браузер настроит DNS через API, создаст форк, секреты, переменные репозитория и запустит workflow.",
+  "home.description": "Обход гео-блокировки с обновлением правил каждую ночь и блок известных доменов рекламы и трекеров на основе открытых источников данных",
   "home.why": "Зачем нужен этот конфигуратор",
   "home.whereCreds": "Где взять CLIENT_ID и AUTH_SECRET",
   "home.nextdns": "NextDNS",
@@ -27,15 +27,13 @@ export const locale: Record<LocaleKey, string> = {
   "home.footer": "GitHub: noVibe/DnsConfUI",
 
   "points.quick.title": "Быстрая настройка",
-  "points.quick.text": "Введите только учётные данные и выберите функции — обход гео-блокировок, блокировка трекеров и рекламы настраиваются автоматически через пресеты.",
-  "points.fork.title": "Собственный форк",
-  "points.fork.text": "DnsConf работает в GitHub-аккаунте пользователя, Actions и владение репозиторием остаются там.",
+  "points.quick.text": "Укажите учетные данные — все остальное будет настроено автоматически.",
+  "points.fork.title": "Полный контроль",
+  "points.fork.text": "Персональный форк DnsConf на вашем GitHub, обновление правил — через механизм GitHub Actions.",
   "points.nocred.title": "Никакого хранения данных",
   "points.nocred.text": "Секреты провайдера шифруются в браузере и отправляются напрямую в GitHub Actions Secrets.",
-  "points.workflow.title": "Нативный workflow",
-  "points.workflow.text": "Текущий DnsConf workflow получает DNS, BLOCK, REDIRECT, CLIENT_ID и AUTH_SECRET.",
-  "points.run.title": "Один первый запуск",
-  "points.run.text": "После настройки интерфейс сразу запускает GitHub Actions workflow.",
+  "points.run.title": "Настроил и забыл",
+  "points.run.text": "Обновление правил геоблокировки, правил блокировки рекламы и трекеров будет осуществляться каждую ночь через механизм GitHub Actions",
 
   "wizard.setup": "Настройка окружения",
   "wizard.setupDesc": "Настройте секреты и переменные GitHub Actions для DnsConf за один проход.",

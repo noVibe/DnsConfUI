@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ShieldCheck, GitFork, Play, Workflow, Zap } from "lucide-react";
+import { ChevronDown, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
@@ -25,11 +25,6 @@ export default function Home() {
       icon: ShieldCheck,
       title: t("points.nocred.title"),
       text: t("points.nocred.text"),
-    },
-    {
-      icon: Workflow,
-      title: t("points.workflow.title"),
-      text: t("points.workflow.text"),
     },
     {
       icon: Play,
