@@ -823,7 +823,6 @@ function ProvisionPanel({
 }) {
   return (
     <section className="rounded-lg border border-line bg-paper p-4">
-      <h3 className="font-semibold text-ink">Provision GitHub</h3>
       <p className="mt-2 text-sm leading-6 text-ink/72">
         Apply DNS provider settings via API and provision your DnsConf fork on GitHub.
       </p>
