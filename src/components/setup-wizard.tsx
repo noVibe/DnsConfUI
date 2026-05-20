@@ -208,15 +208,9 @@ export function SetupWizard() {
       const curId = next[i]?.clientId ?? "";
       if (curId === prevId) continue;
 
-      if (!curId) {
-        next[i] = { ...next[i], provider: "" };
-      } else {
-        const len = curId.length;
-        const detected = len === 32 ? "cloudflare" : len === 6 ? "nextdns" : null;
-        if (detected) {
-          next[i] = { ...next[i], provider: detected };
-        }
-      }
+      const len = curId.length;
+      const detected = len === 32 ? "cloudflare" : len === 6 ? "nextdns" : null;
+      next[i] = { ...next[i], provider: detected ?? "" };
       changed = true;
     }
 
