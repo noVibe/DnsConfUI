@@ -69,6 +69,19 @@ export default function Home() {
             </div>
           </details>
 
+          <details className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+              {t("home.whatIs")}
+              <ChevronDown className="size-4 text-moss" aria-hidden="true" />
+            </summary>
+            <div className="mt-4 space-y-2 text-sm leading-6 text-ink/72">
+              <p>{t("home.whatIs.1")}</p>
+              <p>{t("home.whatIs.2")}</p>
+              <p>{t("home.whatIs.3")}</p>
+              <p>{t("home.whatIs.4")}</p>
+            </div>
+          </details>
+
           {token ? (
             <details className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">

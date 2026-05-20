@@ -1,7 +1,12 @@
 export const locale = {
   "home.title": "Quick setup for",
-  "home.description": "Bypass geo-blocking with nightly rule updates and block known ad & tracker domains from open-source data feeds.",
+  "home.description": "Bypass geo-blocking with nightly rule updates. Block known ad & tracker domains from open-source data feeds.",
   "home.why": "Why this configurator exists",
+  "home.whatIs": "What is noVibe/DnsConf?",
+  "home.whatIs.1": "Uses redirects to arbitrary IP addresses in NextDNS and Cloudflare to access sites blocked by geo-restrictions",
+  "home.whatIs.2": "Safer than configuring untrusted DNS providers directly on your devices",
+  "home.whatIs.3": "Automatic rule updates every night via GitHub Actions",
+  "home.whatIs.4": "Configure unlimited profiles simultaneously",
   "home.whereCreds": "Where to get CLIENT_ID and AUTH_SECRET",
   "home.nextdns": "NextDNS",
   "home.cloudflare": "Cloudflare",
@@ -33,7 +38,7 @@ export const locale = {
   "points.run.title": "Set and forget",
   "points.run.text": "Geo-blocking, ad, and tracker rule updates run every night via GitHub Actions.",
 
-  "wizard.setup": "Environment setup",
+  "wizard.setup": "Configuration setup",
   "wizard.setupDesc": "Setup the DnsConf GitHub Actions secrets and variables in one pass.",
   "wizard.disconnect": "Disconnect",
   "wizard.quick": "Quick",

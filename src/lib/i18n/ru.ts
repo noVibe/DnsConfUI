@@ -2,8 +2,13 @@ import type { LocaleKey } from "./en";
 
 export const locale: Record<LocaleKey, string> = {
   "home.title": "Быстрая настройка",
-  "home.description": "Обход гео-блокировки с обновлением правил каждую ночь и блок известных доменов рекламы и трекеров на основе открытых источников данных",
+  "home.description": "Обход гео-блокировки с обновлением правил каждую ночь. Блокировка известных доменов рекламы и трекеров на основе открытых источников данных",
   "home.why": "Зачем нужен этот конфигуратор",
+  "home.whatIs": "Что такое noVibe/DnsConf?",
+  "home.whatIs.1": "Использование механизма перенаправлений на произвольные IP-адреса в NextDNS и Cloudflare для доступа к сайтам, недоступным из-за гео-блокировки",
+  "home.whatIs.2": "Это безопаснее, чем указывать на своих устройствах провайдеры DNS, которые не проходят аудиты безопасности",
+  "home.whatIs.3": "Автоматическое обновление правил через GitHub Actions каждую ночь",
+  "home.whatIs.4": "Возможность одновременной настройки неограниченного количества профилей",
   "home.whereCreds": "Где взять CLIENT_ID и AUTH_SECRET",
   "home.nextdns": "NextDNS",
   "home.cloudflare": "Cloudflare",
@@ -35,7 +40,7 @@ export const locale: Record<LocaleKey, string> = {
   "points.run.title": "Настроил и забыл",
   "points.run.text": "Обновление правил геоблокировки, правил блокировки рекламы и трекеров будет осуществляться каждую ночь через механизм GitHub Actions",
 
-  "wizard.setup": "Настройка окружения",
+  "wizard.setup": "Настройка конфигурации",
   "wizard.setupDesc": "Настройте секреты и переменные GitHub Actions для DnsConf за один проход.",
   "wizard.disconnect": "Отключиться",
   "wizard.quick": "Быстрая",
