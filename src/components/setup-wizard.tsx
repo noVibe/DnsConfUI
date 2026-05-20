@@ -1076,7 +1076,7 @@ function QuickModeUI({
                 checked={nativeTracking}
                 onChange={onNativeTrackingChange}
                 label="Native Tracking Protection"
-                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku. Configured via NextDNS API."
+                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku, Alexa, Sonos. Configured via NextDNS API."
               />
             ) : null}
 
