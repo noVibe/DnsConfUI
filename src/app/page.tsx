@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
+import { ChevronDown, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
@@ -8,7 +8,7 @@ import { useLocale } from "@/lib/i18n/context";
 
 export default function Home() {
   const { token } = useAuth();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   const points = [
     {
@@ -74,12 +74,29 @@ export default function Home() {
               {t("home.whatIs")}
               <ChevronDown className="size-4 text-moss" aria-hidden="true" />
             </summary>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-ink/72">
-              <p>{t("home.whatIs.1")}</p>
-              <p>{t("home.whatIs.2")}</p>
-              <p>{t("home.whatIs.3")}</p>
-              <p>{t("home.whatIs.4")}</p>
+            <div className="mt-4 grid gap-3">
+              <div className="grid grid-cols-[auto_1fr] gap-3">
+                <MapPin className="mt-1 size-4 text-coral" aria-hidden="true" />
+                <p className="text-sm leading-6 text-ink/72">{t("home.whatIs.1")}</p>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-3">
+                <ShieldCheck className="mt-1 size-4 text-coral" aria-hidden="true" />
+                <p className="text-sm leading-6 text-ink/72">{t("home.whatIs.2")}</p>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-3">
+                <RefreshCw className="mt-1 size-4 text-coral" aria-hidden="true" />
+                <p className="text-sm leading-6 text-ink/72">{t("home.whatIs.3")}</p>
+              </div>
+              <div className="grid grid-cols-[auto_1fr] gap-3">
+                <Layers className="mt-1 size-4 text-coral" aria-hidden="true" />
+                <p className="text-sm leading-6 text-ink/72">{t("home.whatIs.4")}</p>
+              </div>
             </div>
+            {locale === "ru" ? (
+              <div className="mt-3 border-t border-line pt-3 text-xs text-ink/50">
+                <a href="https://habr.com/ru/articles/984224/" target="_blank" rel="noreferrer" className="hover:text-ink/70 hover:underline">Статья на Хабр: Доступ к ChatGPT за 5 минут без VPN</a>
+              </div>
+            ) : null}
           </details>
 
           {token ? (
