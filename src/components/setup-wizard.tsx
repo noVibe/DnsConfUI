@@ -167,6 +167,7 @@ export function SetupWizard() {
         ...dnsConfWorkflow,
         payload: buildDnsConfPayload(config),
         request: createGitHubRequest(token),
+        profileCount: config.profiles.length,
         onStep: async (step) => {
           if (step === "fork") {
             setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
@@ -250,7 +251,8 @@ export function SetupWizard() {
       const provisionResult = await provisionDnsConfRepository({
         ...dnsConfWorkflow,
         payload: buildDnsConfPayload(parsedConfig.data),
-        request: createGitHubRequest(token)
+        request: createGitHubRequest(token),
+        profileCount: parsedConfig.data.profiles.length
       });
       setResult(provisionResult);
       setStatus("done");
