@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
+import { ChevronDown, Globe, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
@@ -8,7 +8,7 @@ import { useLocale } from "@/lib/i18n/context";
 
 export default function Home() {
   const { token } = useAuth();
-  const { t, locale } = useLocale();
+  const { t, locale, setLocale } = useLocale();
 
   const points = [
     {
@@ -173,7 +173,15 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <footer className="pb-6 text-center text-sm text-ink/48">
+      <footer className="flex items-center justify-between pb-6 px-5 md:px-8 text-sm text-ink/48">
+        <button
+          type="button"
+          onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
+          className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-ink/60 hover:text-ink hover:border-ink/30 transition-colors"
+        >
+          <Globe className="size-3" aria-hidden="true" />
+          {locale === "ru" ? "English" : "Русский"}
+        </button>
         <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">
           {t("home.footer")}
         </a>
