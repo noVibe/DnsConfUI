@@ -35,7 +35,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <div className="flex justify-end px-5 pt-4 md:px-8">
+      <div className="flex justify-start px-5 pt-4 md:px-8">
         <button
           type="button"
           onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
