@@ -147,10 +147,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <footer className="pb-6 text-center text-sm text-ink/48">
-        <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">
-          noVibe/DnsConfUI
-        </a>
+      <footer className="pb-6 text-right text-sm text-ink/48">
+        GitHub: <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">noVibe/DnsConfUI</a>
       </footer>
     </main>
   );
