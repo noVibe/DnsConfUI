@@ -35,18 +35,16 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <div className="flex justify-start px-5 pt-4 md:px-8">
-        <button
-          type="button"
-          onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
-          className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white/60 px-2.5 py-1 text-xs font-medium text-ink/50 hover:text-ink hover:border-ink/30 transition-colors"
-        >
-          <Globe className="size-3" aria-hidden="true" />
-          {locale === "ru" ? "English" : "Русский"}
-        </button>
-      </div>
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-5 py-6 md:grid-cols-[0.62fr_1.38fr] md:px-8 md:py-8">
         <div className="flex flex-col gap-5">
+          <button
+            type="button"
+            onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
+            className="self-start inline-flex items-center gap-1.5 rounded-md border border-line bg-white/60 px-2.5 py-1 text-xs font-medium text-ink/50 hover:text-ink hover:border-ink/30 transition-colors"
+          >
+            <Globe className="size-3" aria-hidden="true" />
+            {locale === "ru" ? "English" : "Русский"}
+          </button>
           <div className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
             <div className="text-sm font-medium text-ink/60">
               {t("home.title")}
