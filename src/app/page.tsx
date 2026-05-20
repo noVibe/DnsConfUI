@@ -50,8 +50,8 @@ export default function Home() {
           </div>
           <div className="max-w-xl">
             <p className="text-base leading-7 text-ink/72">
-              Connect GitHub, enter DNS provider settings, and let the browser provision a fork,
-              repository secrets, variables, and the first workflow run.
+              Connect GitHub, enter DNS provider settings, and let the browser configure DNS via API,
+              provision a fork, repository secrets, variables, and the first workflow run.
             </p>
           </div>
 
@@ -147,6 +147,11 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <footer className="pb-6 text-center text-sm text-ink/48">
+        <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">
+          noVibe/DnsConfUI
+        </a>
+      </footer>
     </main>
   );
 }
