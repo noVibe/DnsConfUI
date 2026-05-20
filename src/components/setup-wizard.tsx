@@ -14,11 +14,13 @@ import {
 import { GEOBLOCK_HOSTS_URL, ADBLOCK_HOSTS_URL, OISD_SMALL_URL } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
+import { useLocale } from "@/lib/i18n/context";
 import { useAuth } from "./auth-provider";
 import { Button, cn, Field, SecondaryButton, inputClass, textareaClass } from "./ui";
 
 export function SetupWizard() {
   const { token, setToken } = useAuth();
+  const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<ProvisionResult | null>(null);
@@ -58,25 +60,25 @@ export function SetupWizard() {
 
     if (!provider) {
       setStatus("error");
-      setMessage("Could not determine DNS provider. Check CLIENT_ID.");
+      setMessage(t('wizard.noProvider'));
       return;
     }
 
     if (profiles.length === 0 || !profiles.every(p => p.clientId && p.authSecret)) {
       setStatus("error");
-      setMessage("Fill in all profile credentials.");
+      setMessage(t('wizard.fillAll'));
       return;
     }
 
     if (!geoBlock && !blockAds && !disguisedTrackers && !nativeTracking) {
       setStatus("error");
-      setMessage("Enable at least one feature.");
+      setMessage(t('wizard.enableFeature'));
       return;
     }
 
     if (!profiles.every(p => p.provider === provider)) {
       setStatus("error");
-      setMessage("All profiles must use the same DNS provider in Quick mode.");
+      setMessage(t('wizard.mixedProvider'));
       return;
     }
 
@@ -95,9 +97,9 @@ export function SetupWizard() {
       steps.push({ id: "hosts", label: "Geo-blocking hosts", status: "pending" });
     }
 
-    steps.push({ id: "fork", label: "Fork repository", status: "pending" });
-    steps.push({ id: "secrets", label: "Secrets & variables", status: "pending" });
-    steps.push({ id: "dispatch", label: "Run workflow", status: "pending" });
+    steps.push({ id: "fork", label: t('wizard.fork'), status: "pending" });
+    steps.push({ id: "secrets", label: t('wizard.secrets'), status: "pending" });
+    steps.push({ id: "dispatch", label: t('wizard.run'), status: "pending" });
 
     setQuickSteps(steps);
     setStatus("running");
@@ -186,7 +188,7 @@ export function SetupWizard() {
     } catch (error) {
       setQuickSteps(prev => prev.map(s => s.status === "running" ? { ...s, status: "error" as const } : s));
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Provisioning failed.");
+      setMessage(error instanceof Error ? error.message : t('wizard.provisionFailed'));
     }
   }
 
@@ -234,7 +236,7 @@ export function SetupWizard() {
 
     if (!parsedConfig.success || !token) {
       setStatus("error");
-      setMessage("Configuration is incomplete or GitHub authorization has expired.");
+      setMessage(t('wizard.configIncomplete'));
       return;
     }
 
@@ -252,7 +254,7 @@ export function SetupWizard() {
       setStatus("done");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "GitHub provisioning failed.");
+      setMessage(error instanceof Error ? error.message : t('wizard.ghProvisionFailed'));
     }
   }
 
@@ -295,13 +297,13 @@ export function SetupWizard() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="setup-title" className="text-2xl font-semibold text-ink">
-            Environment setup
+            {t('wizard.setup')}
           </h2>
           <p className="mt-2 text-sm leading-6 text-ink/70">
-            Setup the DnsConf GitHub Actions secrets and variables in one pass.
+            {t('wizard.setupDesc')}
           </p>
         </div>
-        <SecondaryButton onClick={() => setToken(null)}>Disconnect</SecondaryButton>
+        <SecondaryButton onClick={() => setToken(null)}>{t('wizard.disconnect')}</SecondaryButton>
       </div>
 
       <div className="mt-4 flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
@@ -314,9 +316,9 @@ export function SetupWizard() {
               ? "bg-white text-ink shadow-sm"
               : "text-ink/60 hover:text-ink"
           )}
-        >
-          Quick
-        </button>
+          >
+            {t('wizard.quick')}
+          </button>
         <button
           type="button"
           onClick={() => setMode("expert")}
@@ -327,7 +329,7 @@ export function SetupWizard() {
               : "text-ink/60 hover:text-ink"
           )}
         >
-          Expert
+          {t('wizard.expert')}
         </button>
       </div>
 
@@ -422,6 +424,7 @@ function ProfilesSection({
   profileSecretErrors?: Array<{ index: number; message: string }>;
   simplified?: boolean;
 }) {
+  const { t } = useLocale();
   const [selected, setSelected] = useState(0);
   const [credStatus, setCredStatus] = useState<Record<number, { status: "idle" | "validating" | "valid" | "invalid"; message?: string }>>({});
   const validateTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
@@ -491,7 +494,7 @@ function ProfilesSection({
     <section className="space-y-4 rounded-lg border border-line bg-paper p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-ink">Profiles</span>
+          <span className="text-sm font-medium text-ink">{t('profiles.title')}</span>
           <select
             className="rounded-md border border-line bg-white px-2 py-1 text-sm text-ink"
             value={selected}
@@ -508,7 +511,7 @@ function ProfilesSection({
           className="inline-flex items-center gap-1 text-sm text-steel transition hover:text-ink"
         >
           <Plus className="size-4" />
-          Add profile
+          {t('profiles.add')}
         </button>
       </div>
 
@@ -520,15 +523,15 @@ function ProfilesSection({
               type="button"
               onClick={() => remove(selected)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-ink/40 transition hover:border-coral hover:text-coral"
-              aria-label="Remove profile"
+              aria-label={t('profiles.remove')}
             >
               <X className="size-4" />
             </button>
           </div>
-          <Field label={<span>CLIENT_ID <span className="text-coral">*</span></span>} error={profileClientIdErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={profileClientIdErrors?.find(e => e.index === selected)?.message}>
             <input className={inputClass} autoComplete="off" value={profiles[selected].clientId} onChange={(e) => update(selected, "clientId", e.target.value)} />
           </Field>
-          <Field label={<span>AUTH_SECRET <span className="text-coral">*</span></span>} error={profileSecretErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={profileSecretErrors?.find(e => e.index === selected)?.message}>
             <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
           </Field>
           {simplified && credStatus[selected] ? (
@@ -543,9 +546,9 @@ function ProfilesSection({
               <span className={
                 credStatus[selected].status === "invalid" ? "text-coral" : "text-moss"
               }>
-                {credStatus[selected].status === "validating" ? "Checking credentials…" :
-                 credStatus[selected].status === "valid" ? "Credentials verified" :
-                 credStatus[selected].status === "invalid" ? credStatus[selected].message ?? "Invalid credentials" :
+                {credStatus[selected].status === "validating" ? t('profiles.checking') :
+                 credStatus[selected].status === "valid" ? t('profiles.verified') :
+                 credStatus[selected].status === "invalid" ? credStatus[selected].message ?? t('profiles.invalid') :
                  null}
               </span>
             </div>
@@ -554,11 +557,11 @@ function ProfilesSection({
             <div>
               {simplified ? (
                 <div className="text-sm font-medium text-moss">
-                  DNS: {profiles[selected].provider === "cloudflare" ? "Cloudflare" : "NextDNS"}
+                  {t('profiles.dns', { provider: t(profiles[selected].provider === "cloudflare" ? 'profiles.providerCloudflare' : 'profiles.providerNextDNS') })}
                 </div>
               ) : (
                 <>
-                  <div className="text-sm text-moss">DNS: {profiles[selected].provider === "cloudflare" ? "Cloudflare" : "NextDNS"}</div>
+                  <div className="text-sm text-moss">{t('profiles.dns', { provider: t(profiles[selected].provider === "cloudflare" ? 'profiles.providerCloudflare' : 'profiles.providerNextDNS') })}</div>
                   <ScriptBehaviour provider={profiles[selected].provider as "cloudflare" | "nextdns"} />
                 </>
               )}
@@ -568,7 +571,7 @@ function ProfilesSection({
       ) : null}
       {!simplified ? (
         <p className="text-sm leading-6 text-ink/70">
-          Each profile is a separate DNS configuration. Profiles share the same BLOCK and REDIRECT sources.
+          {t('profiles.hint')}
         </p>
       ) : null}
     </section>
@@ -576,29 +579,30 @@ function ProfilesSection({
 }
 
 function ScriptBehaviour({ provider }: { provider: "cloudflare" | "nextdns" }) {
+  const { t } = useLocale();
   return (
     <details className="group mt-2 text-sm leading-6 text-ink/72">
       <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink/60">
         <ChevronDown className="size-3.5 text-moss transition group-open:rotate-180" aria-hidden="true" />
-        Script behaviour
+        {t('script.title')}
       </summary>
       {provider === "nextdns" ? (
         <div className="mt-2 space-y-1.5">
-          <p>Old BLOCK/REDIRECT settings are about to be updated via provided sources.</p>
+          <p>{t('script.oldSettings')}</p>
           <ul className="list-disc space-y-0.5 pl-5">
-            <li>If no sources provided, all NextDNS settings will be removed.</li>
-            <li>Each line is mapped to an IP-domain pair; lines that cannot be parsed are skipped.</li>
-            <li>If only one type of sources is provided, the other type remains untouched.</li>
-            <li>EXCLUDE_REDIRECT domains affect both existing and new redirect rules.</li>
-            <li>NextDNS API rate limiter: 60 seconds between requests.</li>
+            <li>{t('script.noSources')}</li>
+            <li>{t('script.eachLine')}</li>
+            <li>{t('script.oneType')}</li>
+            <li>{t('script.excludeRedirect')}</li>
+            <li>{t('script.rateLimit')}</li>
           </ul>
         </div>
       ) : (
         <div className="mt-2 space-y-1.5">
-          <p>Previously generated data is always about to be removed.</p>
+          <p>{t('script.previousData')}</p>
           <ul className="list-disc space-y-0.5 pl-5">
-            <li>To clear Cloudflare settings, launch without providing sources.</li>
-            <li>Each line is mapped to an IP-domain pair; lines that cannot be parsed are skipped.</li>
+            <li>{t('script.clearCF')}</li>
+            <li>{t('script.eachLineCF')}</li>
           </ul>
         </div>
       )}
@@ -621,6 +625,7 @@ function SourceListInput({
   error?: string;
   tooltip?: string;
 }) {
+  const { t } = useLocale();
   function update(index: number, value: string) {
     const next = [...values];
     next[index] = value;
@@ -665,7 +670,7 @@ function SourceListInput({
               type="button"
               onClick={() => remove(index)}
               className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line text-ink/40 transition hover:border-coral hover:text-coral"
-              aria-label={`Remove ${label}`}
+              aria-label={t('sources.remove', { label })}
             >
               <X className="size-4" />
             </button>
@@ -677,7 +682,7 @@ function SourceListInput({
           className="inline-flex items-center gap-1 text-sm text-steel transition hover:text-ink"
         >
           <Plus className="size-4" />
-          Add source
+          {t('sources.add')}
         </button>
       </div>
     </Field>
@@ -701,38 +706,39 @@ function SourcesSection({
   redirectsError?: string;
   redirectExclusionsError?: string;
 }) {
+  const { t } = useLocale();
   return (
     <section className="flex flex-col gap-4 rounded-lg border border-line bg-paper p-4">
       <div className="rounded-lg border border-line bg-white p-4">
-        <div className="mb-3 font-semibold text-ink">REDIRECT</div>
+        <div className="mb-3 font-semibold text-ink">{t('sources.redirect')}</div>
         <SourceListInput
-          label="Source URLs"
-          tooltip="Parses sources, filtering out lines pointing to 0.0.0.0 and 127.0.0.1. Redirect priority follows sources order — if a domain appears more than once, the first IP is applied."
+          label={t('sources.sourceUrls')}
+          tooltip={t('sources.redirectTooltip')}
           values={redirects ?? []}
           onChange={(values) =>
             setValue("redirects", values, { shouldDirty: true, shouldValidate: true })
           }
-          placeholder="https://example.com/redirect-hosts.txt"
+          placeholder={t('sources.redirectPlaceholder')}
           error={redirectsError}
         />
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
-        <div className="mb-3 font-semibold text-ink">BLOCK</div>
+        <div className="mb-3 font-semibold text-ink">{t('sources.block')}</div>
         <SourceListInput
-          label="Source URLs"
-          tooltip="Parses sources, keeping only lines pointing to 0.0.0.0 and 127.0.0.1. Each line is mapped to an IP-domain pair. You may provide the same source for both BLOCK and REDIRECT."
+          label={t('sources.sourceUrls')}
+          tooltip={t('sources.blockTooltip')}
           values={blocklists ?? []}
           onChange={(values) =>
             setValue("blocklists", values, { shouldDirty: true, shouldValidate: true })
           }
-          placeholder="https://example.com/block-hosts.txt"
+          placeholder={t('sources.blockPlaceholder')}
           error={blocklistsError}
         />
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
-        <div className="mb-3 font-semibold text-ink">EXCLUDE_REDIRECT</div>
+        <div className="mb-3 font-semibold text-ink">{t('sources.excludeRedirect')}</div>
         <Field
-          label={<span className="inline-flex items-center gap-1.5">Domains<span className="group relative inline-flex"><Info className="size-3.5 text-ink/40" /><div className="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-2 text-xs text-ink/80 opacity-0 shadow-sm transition-all delay-150 duration-150 group-hover:visible group-hover:opacity-100">Domains (and their subdomains) to exclude from redirect rules. These will be removed from existing redirects and won&apos;t be added with new ones.</div></span></span>}
+          label={<span className="inline-flex items-center gap-1.5">{t('sources.domains')}<span className="group relative inline-flex"><Info className="size-3.5 text-ink/40" /><div className="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-2 text-xs text-ink/80 opacity-0 shadow-sm transition-all delay-150 duration-150 group-hover:visible group-hover:opacity-100">{t('sources.excludeTooltip')}</div></span></span>}
           error={redirectExclusionsError}
         >
           <textarea
@@ -741,7 +747,7 @@ function SourcesSection({
             onChange={(e) =>
               setValue("redirectExclusions", parseExcludeDomains(e.target.value), { shouldDirty: true, shouldValidate: true })
             }
-            placeholder="keep.example"
+            placeholder={t('sources.excludePlaceholder')}
           />
         </Field>
       </div>
@@ -750,10 +756,11 @@ function SourcesSection({
 }
 
 function ReviewPanel({ payload, valid }: { payload: ReturnType<typeof buildDnsConfPayload> | null; valid: boolean }) {
+  const { t } = useLocale();
   if (!valid || !payload) {
     return (
       <section className="rounded-lg border border-coral/30 bg-coral/10 p-4 text-sm text-ink">
-        Check CLIENT_ID, AUTH_SECRET, and any provided source URLs before provisioning.
+        {t('review.desc')}
       </section>
     );
   }
@@ -761,7 +768,7 @@ function ReviewPanel({ payload, valid }: { payload: ReturnType<typeof buildDnsCo
   return (
     <details className="group rounded-lg border border-line bg-paper">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
-        Review
+        {t('review.title')}
         <ChevronDown className="size-4 text-moss transition group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="space-y-3 border-t border-line px-4 pb-4 pt-3 text-sm text-ink/72">
@@ -773,18 +780,18 @@ function ReviewPanel({ payload, valid }: { payload: ReturnType<typeof buildDnsCo
             <div className="space-y-2">
               {ids.map((id, i) => (
                 <div key={i} className="rounded-md border border-line bg-white px-3 py-2">
-                  <div className="font-medium text-ink">Profile {i + 1}</div>
-                  <div className="mt-1 text-ink/70">ID: {id}</div>
-                  <div className="text-ink/70">Secret: {"*".repeat(Math.min(secrets[i]?.length ?? 0, 20))}</div>
-                  <div className="text-ink/70">DNS: {dns[i] ?? ""}</div>
+                  <div className="font-medium text-ink">{t('review.profile', { n: i + 1 })}</div>
+                  <div className="mt-1 text-ink/70">{t('review.id', { value: id })}</div>
+                  <div className="text-ink/70">{t('review.secret', { value: "*".repeat(Math.min(secrets[i]?.length ?? 0, 20)) })}</div>
+                  <div className="text-ink/70">{t('review.dns', { value: dns[i] ?? "" })}</div>
                 </div>
               ))}
             </div>
           );
         })()}
-        <SummaryLine label="BLOCK" value={payload.variables.BLOCK || "None"} />
-        <SummaryLine label="REDIRECT" value={payload.variables.REDIRECT || "None"} />
-        <SummaryLine label="EXCLUDE_REDIRECT" value={payload.variables.EXCLUDE_REDIRECT || "None"} />
+        <SummaryLine label="BLOCK" value={payload.variables.BLOCK || t('review.none')} />
+        <SummaryLine label="REDIRECT" value={payload.variables.REDIRECT || t('review.none')} />
+        <SummaryLine label="EXCLUDE_REDIRECT" value={payload.variables.EXCLUDE_REDIRECT || t('review.none')} />
       </div>
     </details>
   );
@@ -817,10 +824,11 @@ function ProvisionPanel({
   needsSync: boolean | null;
   onSync: () => Promise<void>;
 }) {
+  const { t } = useLocale();
   return (
     <section className="rounded-lg border border-line bg-paper p-4">
       <p className="mt-2 text-sm leading-6 text-ink/72">
-        Apply DNS provider settings via API and provision your DnsConf fork on GitHub.
+        {t('provision.desc')}
       </p>
       {needsSync && status === "idle" ? (
         <button
@@ -830,7 +838,7 @@ function ProvisionPanel({
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-moss/40 bg-white px-3 py-2 text-sm font-medium text-moss transition hover:bg-moss/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <GitBranch className="size-4" aria-hidden="true" />
-          {syncing ? "Syncing…" : synced ? "Synced!" : "Sync fork"}
+          {syncing ? t('provision.syncing') : synced ? t('provision.synced') : t('provision.sync')}
         </button>
       ) : null}
 
@@ -840,14 +848,14 @@ function ProvisionPanel({
         ) : (
           <Play className="size-4" aria-hidden="true" />
         )}
-        {status === "running" ? "Applying…" : "Apply configuration"}
+        {status === "running" ? t('provision.applying') : t('provision.apply')}
       </Button>
 
       {status === "done" && result ? (
         <div className="mt-4 space-y-3 rounded-md border border-moss/30 bg-mint p-3 text-sm text-ink">
           <div className="flex items-center gap-2 font-semibold">
             <CheckCircle2 className="size-4 text-moss" aria-hidden="true" />
-            Repository configured
+            {t('provision.configured')}
           </div>
           {result.workflowRunUrl ? (
             <a
@@ -857,7 +865,7 @@ function ProvisionPanel({
               rel="noreferrer"
             >
               <Play className="size-4" aria-hidden="true" />
-              Open workflow run
+              {t('provision.openRun')}
             </a>
           ) : null}
           <button
@@ -867,7 +875,7 @@ function ProvisionPanel({
             className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-moss/40 bg-white px-3 py-2 text-sm font-medium text-moss transition hover:bg-moss/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Star className={`size-4 ${starred ? "fill-moss text-moss" : ""}`} aria-hidden="true" />
-            {starring ? "Starring…" : starred ? "Starred!" : "Give a Star!"}
+            {starring ? t('provision.starring') : starred ? t('provision.starred') : t('provision.star')}
           </button>
           {(needsSync || syncing || synced) ? (
             <button
@@ -877,7 +885,7 @@ function ProvisionPanel({
               className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-moss/40 bg-white px-3 py-2 text-sm font-medium text-moss transition hover:bg-moss/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <GitBranch className="size-4" aria-hidden="true" />
-              {syncing ? "Syncing…" : synced ? "Synced!" : "Sync fork"}
+          {syncing ? t('provision.syncing') : synced ? t('provision.synced') : t('provision.sync')}
             </button>
           ) : null}
         </div>
@@ -998,6 +1006,7 @@ function QuickModeUI({
   needsSync: boolean | null;
   onSync: () => Promise<void>;
 }) {
+  const { t } = useLocale();
   const isNextDNS = providerLabel === "NextDNS";
   const noToggles = !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking;
 
@@ -1014,13 +1023,13 @@ function QuickModeUI({
 
         {providerLabel ? (
           <section className="space-y-3 rounded-lg border border-line bg-paper p-4">
-            <span className="text-sm font-medium text-ink">Features</span>
+            <span className="text-sm font-medium text-ink">{t('quick.features')}</span>
 
             <ToggleSwitch
               checked={geoBlock}
               onChange={onGeoBlockChange}
-              label="Bypass geo-blocking"
-              tooltip="Prevent DNS-based geo-restrictions using curated hosts filters."
+              label={t('quick.bypass')}
+              tooltip={t('quick.bypassTooltip')}
             >
               {geoBlock ? (
                 <div className="flex items-center gap-2">
@@ -1031,7 +1040,7 @@ function QuickModeUI({
                       onChange={(e) => onGeoHideChange(e.target.checked)}
                       className="size-3 accent-moss"
                     />
-                    <span>GeoHide</span>
+                    <span>{t('quick.geohide')}</span>
                   </label>
                   <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
                     <input
@@ -1040,7 +1049,7 @@ function QuickModeUI({
                       onChange={(e) => onMalwChange(e.target.checked)}
                       className="size-3 accent-moss"
                     />
-                    <span>Malw</span>
+                    <span>{t('quick.malw')}</span>
                   </label>
                 </div>
               ) : null}
@@ -1049,11 +1058,11 @@ function QuickModeUI({
             <ToggleSwitch
               checked={blockAds}
               onChange={onBlockAdsChange}
-              label="Block ads &amp; trackers"
+              label={t('quick.blockAds')}
               tooltip={
                 isNextDNS
-                  ? "Activate blocklists: NextDNS Recommended, OISD, AdGuard Russian, AdGuard DNS."
-                  : "Add a hosts-based filter to block advertising and tracking domains."
+                  ? t('quick.blockAdsNdTooltip')
+                  : t('quick.blockAdsCfTooltip')
               }
             />
 
@@ -1061,8 +1070,8 @@ function QuickModeUI({
               <ToggleSwitch
                 checked={disguisedTrackers}
                 onChange={onDisguisedTrackersChange}
-                label="Block Disguised Third-Party Trackers"
-                tooltip="Prevent trackers that disguise as first-party content. Configured via NextDNS API."
+                label={t('quick.disguised')}
+                tooltip={t('quick.disguisedTooltip')}
               />
             ) : null}
 
@@ -1070,8 +1079,8 @@ function QuickModeUI({
               <ToggleSwitch
                 checked={nativeTracking}
                 onChange={onNativeTrackingChange}
-                label="Native Tracking Protection"
-                tooltip="Block built-in trackers in Apple, Windows, Samsung, Huawei, Xiaomi, Roku, Alexa, Sonos. Configured via NextDNS API."
+                label={t('quick.native')}
+                tooltip={t('quick.nativeTooltip')}
               />
             ) : null}
 
@@ -1085,7 +1094,7 @@ function QuickModeUI({
       <aside className="space-y-5">
         {status !== "idle" ? (
           <section className="rounded-lg border border-line bg-paper p-4">
-            <h3 className="text-sm font-semibold text-ink">Progress</h3>
+            <h3 className="text-sm font-semibold text-ink">{t('quick.progress')}</h3>
             <ul className="mt-3 space-y-2">
               {quickSteps.map(step => (
                 <li key={step.id} className="flex items-center gap-2 text-sm">
