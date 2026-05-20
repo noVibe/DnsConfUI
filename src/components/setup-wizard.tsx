@@ -208,15 +208,9 @@ export function SetupWizard() {
       const curId = next[i]?.clientId ?? "";
       if (curId === prevId) continue;
 
-      if (!curId) {
-        next[i] = { ...next[i], provider: "" };
-      } else {
-        const len = curId.length;
-        const detected = len === 32 ? "cloudflare" : len === 6 ? "nextdns" : null;
-        if (detected) {
-          next[i] = { ...next[i], provider: detected };
-        }
-      }
+      const len = curId.length;
+      const detected = len === 32 ? "cloudflare" : len === 6 ? "nextdns" : null;
+      next[i] = { ...next[i], provider: detected ?? "" };
       changed = true;
     }
 
@@ -738,7 +732,7 @@ function SourcesSection({
       <div className="rounded-lg border border-line bg-white p-4">
         <div className="mb-3 font-semibold text-ink">EXCLUDE_REDIRECT</div>
         <Field
-          label={<span className="inline-flex items-center gap-1.5">Domains<span className="group relative inline-flex"><Info className="size-3.5 text-ink/40" /><div className="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-2 text-xs text-ink/80 opacity-0 shadow-sm transition-all delay-150 duration-150 group-hover:visible group-hover:opacity-100">Domains (and their subdomains) to exclude from redirect rules. These will be removed from existing redirects and won't be added with new ones.</div></span></span>}
+          label={<span className="inline-flex items-center gap-1.5">Domains<span className="group relative inline-flex"><Info className="size-3.5 text-ink/40" /><div className="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-2 text-xs text-ink/80 opacity-0 shadow-sm transition-all delay-150 duration-150 group-hover:visible group-hover:opacity-100">Domains (and their subdomains) to exclude from redirect rules. These will be removed from existing redirects and won&apos;t be added with new ones.</div></span></span>}
           error={redirectExclusionsError}
         >
           <textarea
