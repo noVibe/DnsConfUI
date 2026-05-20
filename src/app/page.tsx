@@ -175,6 +175,13 @@ export default function Home() {
               </div>
             </details>
           ) : null}
+
+          <div className="flex items-center gap-2 text-xs text-ink/40">
+            <span>GitHub:</span>
+            <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/70 hover:underline transition-colors">noVibe/DnsConfUI</a>
+            <span className="text-ink/20">|</span>
+            <a href="https://github.com/noVibe/DnsConf" target="_blank" rel="noreferrer" className="hover:text-ink/70 hover:underline transition-colors">noVibe/DnsConf</a>
+          </div>
         </div>
 
         <div>
@@ -183,14 +190,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <footer className="pb-6 text-center text-sm text-ink/48">
-        <div className="flex items-center justify-center gap-3">
-          <span>GitHub:</span>
-          <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">noVibe/DnsConfUI</a>
-          <span className="text-ink/30">|</span>
-          <a href="https://github.com/noVibe/DnsConf" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">noVibe/DnsConf</a>
-        </div>
-      </footer>
     </main>
   );
 }
