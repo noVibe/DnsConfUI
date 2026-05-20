@@ -1,14 +1,16 @@
 "use client";
 
-import { ChevronDown, Globe, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap } from "lucide-react";
+import { ChevronDown, Globe, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap, Sun, Moon } from "lucide-react";
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
 import { useLocale } from "@/lib/i18n/context";
+import { useTheme } from "@/lib/theme/context";
 
 export default function Home() {
   const { token } = useAuth();
   const { t, locale, setLocale } = useLocale();
+  const { theme, toggleTheme } = useTheme();
 
   const points = [
     {
@@ -37,14 +39,29 @@ export default function Home() {
     <main className="min-h-screen">
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-5 py-6 md:grid-cols-[0.62fr_1.38fr] md:px-8 md:py-8">
         <div className="flex flex-col gap-5">
-          <button
-            type="button"
-            onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
-            className="self-start inline-flex items-center gap-1.5 rounded-md border border-line bg-white/60 px-2.5 py-1 text-xs font-medium text-ink/50 hover:text-ink hover:border-ink/30 transition-colors"
-          >
-            <Globe className="size-3" aria-hidden="true" />
-            {locale === "ru" ? "English" : "Русский"}
-          </button>
+          <div className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
+            <div className="text-xs font-medium text-ink/40 uppercase tracking-wider">
+              {t("home.settings")}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 hover:text-ink hover:border-ink/30 transition-colors"
+              >
+                <Globe className="size-3.5" aria-hidden="true" />
+                {locale === "ru" ? "English" : "Русский"}
+              </button>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 hover:text-ink hover:border-ink/30 transition-colors"
+              >
+                {theme === "light" ? <Moon className="size-3.5" aria-hidden="true" /> : <Sun className="size-3.5" aria-hidden="true" />}
+                {theme === "light" ? t("home.theme.dark") : t("home.theme.light")}
+              </button>
+            </div>
+          </div>
           <div className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
             <div className="text-sm font-medium text-ink/60">
               {t("home.title")}

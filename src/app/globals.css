@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-ink: #17202a;
   --color-paper: #f8faf7;
@@ -17,6 +19,20 @@
   color: #17202a;
 }
 
+.dark {
+  color-scheme: dark;
+  background: #0f1419;
+  color: #e1e8ed;
+  --color-ink: #e1e8ed;
+  --color-paper: #1a2332;
+  --color-moss: #6a9d7a;
+  --color-mint: #1a2e24;
+  --color-coral: #e88b6a;
+  --color-steel: #6a9db8;
+  --color-line: #2a3545;
+  --shadow-soft: 0 18px 60px rgb(0 0 0 / 0.4);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -28,6 +44,12 @@ body {
     linear-gradient(120deg, rgb(220 239 228 / 0.82), transparent 42%),
     linear-gradient(180deg, #f8faf7 0%, #eef4f0 100%);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.dark body {
+  background:
+    linear-gradient(120deg, rgb(30 40 50 / 0.82), transparent 42%),
+    linear-gradient(180deg, #0f1419 0%, #1a2332 100%);
 }
 
 button,

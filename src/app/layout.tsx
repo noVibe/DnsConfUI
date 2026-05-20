@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-provider";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { ThemeProvider } from "@/lib/theme/context";
 
 export const metadata: Metadata = {
   title: "DnsConf",
@@ -14,7 +15,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="ru">
       <body>
         <AuthProvider>
-          <LocaleProvider>{children}</LocaleProvider>
+          <ThemeProvider>
+            <LocaleProvider>{children}</LocaleProvider>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>
