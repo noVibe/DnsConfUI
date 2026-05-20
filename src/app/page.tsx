@@ -182,9 +182,12 @@ export default function Home() {
           <Globe className="size-3" aria-hidden="true" />
           {locale === "ru" ? "English" : "Русский"}
         </button>
-        <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">
-          {t("home.footer")}
-        </a>
+        <div className="flex items-center gap-3">
+          <span>GitHub:</span>
+          <a href="https://github.com/noVibe/DnsConfUI" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">noVibe/DnsConfUI</a>
+          <span className="text-ink/30">|</span>
+          <a href="https://github.com/noVibe/DnsConf" target="_blank" rel="noreferrer" className="hover:text-ink/72 hover:underline">noVibe/DnsConf</a>
+        </div>
       </footer>
     </main>
   );
