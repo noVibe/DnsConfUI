@@ -1076,28 +1076,26 @@ function QuickModeUI({
               label={t('quick.bypass')}
               tooltip={t('quick.bypassTooltip')}
             >
-              {geoBlock ? (
-                <div className="flex items-center gap-2">
-                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
-                    <input
-                      type="checkbox"
-                      checked={geoHideChecked}
-                      onChange={(e) => onGeoHideChange(e.target.checked)}
-                      className="size-3 accent-moss"
-                    />
-                    <span>{t('quick.geohide')}</span>
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
-                    <input
-                      type="checkbox"
-                      checked={malwChecked}
-                      onChange={(e) => onMalwChange(e.target.checked)}
-                      className="size-3 accent-moss"
-                    />
-                    <span>{t('quick.malw')}</span>
-                  </label>
-                </div>
-              ) : null}
+              <div className={`flex items-center gap-2 ${geoBlock ? "" : "opacity-40"}`}>
+                <label className={`flex items-center gap-1 text-xs ${geoBlock ? "cursor-pointer text-ink/70 hover:text-ink" : "text-ink/40"}`}>
+                  <input
+                    type="checkbox"
+                    checked={geoHideChecked}
+                    onChange={(e) => onGeoHideChange(e.target.checked)}
+                    className="size-3 accent-moss"
+                  />
+                  <span>{t('quick.geohide')}</span>
+                </label>
+                <label className={`flex items-center gap-1 text-xs ${geoBlock ? "cursor-pointer text-ink/70 hover:text-ink" : "text-ink/40"}`}>
+                  <input
+                    type="checkbox"
+                    checked={malwChecked}
+                    onChange={(e) => onMalwChange(e.target.checked)}
+                    className="size-3 accent-moss"
+                  />
+                  <span>{t('quick.malw')}</span>
+                </label>
+              </div>
             </ToggleSwitch>
 
             <ToggleSwitch
