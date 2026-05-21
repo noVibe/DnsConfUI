@@ -546,9 +546,9 @@ function ProfilesSection({
         <button
           type="button"
           onClick={add}
-          className="inline-flex items-center gap-1 text-sm text-steel transition hover:text-ink"
+          className="inline-flex items-center gap-0.5 text-xs text-steel transition hover:text-ink"
         >
-          <Plus className="size-4" />
+          <Plus className="size-3.5" />
           {t('profiles.add')}
         </button>
       </div>
