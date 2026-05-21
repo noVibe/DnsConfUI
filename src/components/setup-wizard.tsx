@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, ChevronDown, GitBranch, Info, Loader2, Play, Plus, Star, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type UseFormSetValue } from "react-hook-form";
 import {
   buildDnsConfPayload,
@@ -11,15 +11,16 @@ import {
   type DnsConfConfig,
   type Profile
 } from "@/domain/dnsconf-config";
+import type { LocaleKey } from "@/lib/i18n/en";
 import { GEOBLOCK_HOSTS_URL, ADBLOCK_HOSTS_URL, OISD_SMALL_URL } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { useAuth } from "./auth-provider";
-import { Button, cn, Field, SecondaryButton, inputClass, textareaClass } from "./ui";
+import { Button, cn, Field, inputClass, textareaClass } from "./ui";
 
 export function SetupWizard() {
-  const { token, setToken } = useAuth();
+  const { token } = useAuth();
   const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -37,7 +38,27 @@ export function SetupWizard() {
   const [blockAds, setBlockAds] = useState(true);
   const [disguisedTrackers, setDisguisedTrackers] = useState(true);
   const [nativeTracking, setNativeTracking] = useState(true);
+
+  const handleGeoHideChange = useCallback((checked: boolean) => {
+    setGeoHideChecked(checked);
+    if (!checked && !malwChecked) {
+      setGeoBlock(false);
+    } else if (checked && !geoBlock) {
+      setGeoBlock(true);
+    }
+  }, [geoBlock, malwChecked]);
+
+  const handleMalwChange = useCallback((checked: boolean) => {
+    setMalwChecked(checked);
+    if (!checked && !geoHideChecked) {
+      setGeoBlock(false);
+    } else if (checked && !geoBlock) {
+      setGeoBlock(true);
+    }
+  }, [geoBlock, geoHideChecked]);
+
   const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
+  const [allProfilesValid, setAllProfilesValid] = useState(false);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
   const normalizedValues = normalizeValues(values);
@@ -46,12 +67,27 @@ export function SetupWizard() {
 
   const hasToggles = geoBlock || blockAds || disguisedTrackers || nativeTracking;
 
+  const mixedProviderIndices = useMemo(() => {
+    const profiles = values.profiles ?? [];
+    if (profiles.length < 2) return new Set<number>();
+    const refProvider = profiles[0]?.provider;
+    if (!refProvider) return new Set<number>();
+    const indices = new Set<number>();
+    for (let i = 1; i < profiles.length; i++) {
+      if (profiles[i]?.provider && profiles[i]?.provider !== refProvider) {
+        indices.add(i);
+      }
+    }
+    return indices;
+  }, [values.profiles]);
+
   const canQuickProvision = useMemo(() => {
     const profiles = values.profiles ?? [];
     if (profiles.length === 0) return false;
+    if (mixedProviderIndices.size > 0) return false;
     const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
-    return allFilled && hasToggles && !!profiles[0]?.provider;
-  }, [values.profiles, hasToggles]);
+    return allFilled && hasToggles && !!profiles[0]?.provider && allProfilesValid;
+  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid]);
 
   async function quickProvision() {
     if (!token) return;
@@ -294,54 +330,17 @@ export function SetupWizard() {
 
   return (
     <section aria-labelledby="setup-title">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 id="setup-title" className="text-2xl font-semibold text-ink">
-            {t('wizard.setup')}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-ink/70">
-            {t('wizard.setupDesc')}
-          </p>
-        </div>
-        <SecondaryButton onClick={() => setToken(null)}>{t('wizard.disconnect')}</SecondaryButton>
-      </div>
-
-      <div className="mt-4 flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
-        <button
-          type="button"
-          onClick={() => setMode("quick")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition",
-            mode === "quick"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink/60 hover:text-ink"
-          )}
-          >
-            {t('wizard.quick')}
-          </button>
-        <button
-          type="button"
-          onClick={() => setMode("expert")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition",
-            mode === "expert"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink/60 hover:text-ink"
-          )}
-        >
-          {t('wizard.expert')}
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 id="setup-title" className="text-2xl font-semibold text-ink">
+          {t('wizard.setup')}
+        </h2>
+        <ModeTabs mode={mode} setMode={setMode} t={t} />
       </div>
 
       {mode === "expert" ? (
         <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5">
-            <ProfilesSection
-              profiles={values.profiles ?? []}
-              setValue={form.setValue}
-              profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
-              profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
-            />
+            <CredsGuide t={t} />
             <SourcesSection
               blocklists={values.blocklists}
               redirects={values.redirects}
@@ -350,6 +349,13 @@ export function SetupWizard() {
               blocklistsError={fieldError(parsed, "blocklists")}
               redirectsError={fieldError(parsed, "redirects")}
               redirectExclusionsError={fieldError(parsed, "redirectExclusions")}
+            />
+            <ProfilesSection
+              profiles={values.profiles ?? []}
+              setValue={form.setValue}
+              profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
+              profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
+              onValidChange={setAllProfilesValid}
             />
           </div>
 
@@ -360,7 +366,7 @@ export function SetupWizard() {
               message={message}
               result={result}
               onProvision={provision}
-              disabled={!parsed.success || status === "running"}
+              disabled={!parsed.success || status === "running" || !allProfilesValid}
               starred={starred}
               starring={starring}
               onStar={handleStar}
@@ -374,11 +380,14 @@ export function SetupWizard() {
       ) : (
         <div className="mt-6">
           <QuickModeUI
+            mode={mode}
+            setMode={setMode}
             profiles={values.profiles ?? []}
             providerLabel={providerLabel}
             setValue={form.setValue}
             profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
             profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
+            mixedProviderIndices={mixedProviderIndices}
             geoBlock={geoBlock}
             geoHideChecked={geoHideChecked}
             malwChecked={malwChecked}
@@ -386,11 +395,12 @@ export function SetupWizard() {
             disguisedTrackers={disguisedTrackers}
             nativeTracking={nativeTracking}
             onGeoBlockChange={setGeoBlock}
-            onGeoHideChange={setGeoHideChecked}
-            onMalwChange={setMalwChecked}
+            onGeoHideChange={handleGeoHideChange}
+            onMalwChange={handleMalwChange}
             onBlockAdsChange={setBlockAds}
             onDisguisedTrackersChange={setDisguisedTrackers}
             onNativeTrackingChange={setNativeTracking}
+            onProfilesValidChange={setAllProfilesValid}
             quickSteps={quickSteps}
             onProvision={quickProvision}
             status={status}
@@ -416,13 +426,17 @@ function ProfilesSection({
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
-  simplified
+  mixedProviderIndices,
+  simplified,
+  onValidChange
 }: {
   profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  mixedProviderIndices?: Set<number>;
   simplified?: boolean;
+  onValidChange?: (v: boolean) => void;
 }) {
   const { t } = useLocale();
   const [selected, setSelected] = useState(0);
@@ -431,7 +445,6 @@ function ProfilesSection({
   useEffect(() => () => { Object.values(validateTimers.current).forEach(clearTimeout); }, []);
 
   useEffect(() => {
-    if (!simplified) return;
     const p = profiles[selected];
     const detected = p?.clientId?.length === 32 ? "cloudflare" : p?.clientId?.length === 6 ? "nextdns" : null;
     if (!detected || !p?.authSecret?.trim() || credStatus[selected]) return;
@@ -448,13 +461,21 @@ function ProfilesSection({
     validateTimers.current[selected] = timer;
   }, [selected, simplified]);
 
+  useEffect(() => {
+    if (!onValidChange) return;
+    const allValid = profiles.every((p, i) => {
+      if (!p.clientId?.trim() || !p.authSecret?.trim()) return true;
+      return credStatus[i]?.status === "valid";
+    });
+    onValidChange(allValid);
+  }, [credStatus, profiles, onValidChange]);
+
   function update(index: number, field: "clientId" | "authSecret" | "provider", value: string) {
     const next = profiles.map((p, i) =>
       i === index ? { ...p, [field]: value } : p
     ) as DnsConfConfig["profiles"];
     setValue("profiles", next, { shouldDirty: true, shouldValidate: true });
 
-    if (!simplified) return;
     if (field !== "clientId" && field !== "authSecret") return;
 
     const timer = validateTimers.current[index];
@@ -508,9 +529,9 @@ function ProfilesSection({
         <button
           type="button"
           onClick={add}
-          className="inline-flex items-center gap-1 text-sm text-steel transition hover:text-ink"
+          className="inline-flex items-center gap-0.5 text-xs text-steel transition hover:text-ink"
         >
-          <Plus className="size-4" />
+          <Plus className="size-3.5" />
           {t('profiles.add')}
         </button>
       </div>
@@ -528,10 +549,10 @@ function ProfilesSection({
               <X className="size-4" />
             </button>
           </div>
-          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={profileClientIdErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={translatedError(profileClientIdErrors?.find(e => e.index === selected)?.message, t)}>
             <input className={inputClass} autoComplete="off" value={profiles[selected].clientId} onChange={(e) => update(selected, "clientId", e.target.value)} />
           </Field>
-          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={profileSecretErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={translatedError(profileSecretErrors?.find(e => e.index === selected)?.message, t)}>
             <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
           </Field>
           {simplified && credStatus[selected] ? (
@@ -565,6 +586,11 @@ function ProfilesSection({
                   <ScriptBehaviour provider={profiles[selected].provider as "cloudflare" | "nextdns"} />
                 </>
               )}
+            </div>
+          ) : null}
+          {simplified && mixedProviderIndices?.has(selected) ? (
+            <div className="mt-2 rounded-md border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral">
+              {t('wizard.mixedProvider')}
             </div>
           ) : null}
         </div>
@@ -944,11 +970,14 @@ function ToggleSwitch({
 }
 
 function QuickModeUI({
+  mode,
+  setMode,
   profiles,
   providerLabel,
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
+  mixedProviderIndices,
   geoBlock,
   geoHideChecked,
   malwChecked,
@@ -961,6 +990,7 @@ function QuickModeUI({
   onBlockAdsChange,
   onDisguisedTrackersChange,
   onNativeTrackingChange,
+  onProfilesValidChange,
   onProvision,
   status,
   message,
@@ -975,11 +1005,14 @@ function QuickModeUI({
   needsSync,
   onSync
 }: {
+  mode: "quick" | "expert";
+  setMode: (m: "quick" | "expert") => void;
   profiles: DnsConfConfig["profiles"];
   providerLabel: string | null;
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  mixedProviderIndices: Set<number>;
   geoBlock: boolean;
   geoHideChecked: boolean;
   malwChecked: boolean;
@@ -992,6 +1025,7 @@ function QuickModeUI({
   onBlockAdsChange: (v: boolean) => void;
   onDisguisedTrackersChange: (v: boolean) => void;
   onNativeTrackingChange: (v: boolean) => void;
+  onProfilesValidChange: (v: boolean) => void;
   onProvision: () => void;
   status: "idle" | "running" | "done" | "error";
   message: string;
@@ -1013,12 +1047,15 @@ function QuickModeUI({
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-5">
+        <CredsGuide t={t} />
          <ProfilesSection
             profiles={profiles}
             setValue={setValue}
             profileClientIdErrors={profileClientIdErrors}
             profileSecretErrors={profileSecretErrors}
+            mixedProviderIndices={mixedProviderIndices}
             simplified
+            onValidChange={onProfilesValidChange}
           />
 
         {providerLabel ? (
@@ -1031,28 +1068,26 @@ function QuickModeUI({
               label={t('quick.bypass')}
               tooltip={t('quick.bypassTooltip')}
             >
-              {geoBlock ? (
-                <div className="flex items-center gap-2">
-                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
-                    <input
-                      type="checkbox"
-                      checked={geoHideChecked}
-                      onChange={(e) => onGeoHideChange(e.target.checked)}
-                      className="size-3 accent-moss"
-                    />
-                    <span>{t('quick.geohide')}</span>
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-1 text-xs text-ink/70 hover:text-ink">
-                    <input
-                      type="checkbox"
-                      checked={malwChecked}
-                      onChange={(e) => onMalwChange(e.target.checked)}
-                      className="size-3 accent-moss"
-                    />
-                    <span>{t('quick.malw')}</span>
-                  </label>
-                </div>
-              ) : null}
+              <div className={`flex items-center gap-2 ${geoBlock ? "" : "opacity-40"}`}>
+                <label className={`flex items-center gap-1 text-xs ${geoBlock ? "cursor-pointer text-ink/70 hover:text-ink" : "text-ink/40"}`}>
+                  <input
+                    type="checkbox"
+                    checked={geoHideChecked}
+                    onChange={(e) => onGeoHideChange(e.target.checked)}
+                    className="size-3 accent-moss"
+                  />
+                  <span>{t('quick.geohide')}</span>
+                </label>
+                <label className={`flex items-center gap-1 text-xs ${geoBlock ? "cursor-pointer text-ink/70 hover:text-ink" : "text-ink/40"}`}>
+                  <input
+                    type="checkbox"
+                    checked={malwChecked}
+                    onChange={(e) => onMalwChange(e.target.checked)}
+                    className="size-3 accent-moss"
+                  />
+                  <span>{t('quick.malw')}</span>
+                </label>
+              </div>
             </ToggleSwitch>
 
             <ToggleSwitch
@@ -1149,6 +1184,106 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModeTabs({ mode, setMode, t }: { mode: "quick" | "expert"; setMode: (m: "quick" | "expert") => void; t: (key: LocaleKey, params?: Record<string, string | number>) => string }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
+      <button
+        type="button"
+        onClick={() => setMode("quick")}
+        className={cn(
+          "rounded-md px-3 py-1.5 text-sm font-medium transition",
+          mode === "quick"
+            ? "bg-white text-ink shadow-sm"
+            : "text-ink/60 hover:text-ink"
+        )}
+      >
+        {t('wizard.quick')}
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("expert")}
+        className={cn(
+          "rounded-md px-3 py-1.5 text-sm font-medium transition",
+          mode === "expert"
+            ? "bg-white text-ink shadow-sm"
+            : "text-ink/60 hover:text-ink"
+        )}
+      >
+        {t('wizard.expert')}
+      </button>
+    </div>
+  );
+}
+
+function CredsGuide({ t }: { t: (key: LocaleKey, params?: Record<string, string | number>) => string }) {
+  return (
+    <details className="rounded-lg border border-moss/30 bg-white p-4 shadow-soft">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+        {t("home.whereCreds")}
+        <ChevronDown className="size-4 text-moss" aria-hidden="true" />
+      </summary>
+      <div className="mt-4 space-y-3 text-sm leading-6 text-ink/72">
+
+        <details className="rounded-md border border-line bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
+            {t("home.nextdns")}
+            <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.clientId")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.clientId.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io" target="_blank" rel="noreferrer">{t("home.nextdnsSetupPage")}</a></li>
+                <li>{t("home.clientId.nextdns.2")}</li>
+              </ol>
+            </div>
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.authSecret")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.authSecret.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io/account" target="_blank" rel="noreferrer">my.nextdns.io/account</a></li>
+                <li>{t("home.authSecret.nextdns.2")}</li>
+              </ol>
+            </div>
+          </div>
+        </details>
+
+        <details className="rounded-md border border-line bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
+            {t("home.cloudflare")}
+            <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.clientId")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.clientId.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">{t("home.dashCloudflare")}</a></li>
+                <li>{t("home.clientId.cf.2")}</li>
+                <li>{t("home.clientId.cf.3")}</li>
+                <li>{t("home.clientId.cf.4")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/?to=/:account/workers" target="_blank" rel="noreferrer">dash.cloudflare.com/?to=/:account/workers</a></li>
+                <li>{t("home.clientId.cf.5")}</li>
+              </ol>
+            </div>
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.authSecret")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.authSecret.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer">dash.cloudflare.com/profile/api-tokens</a></li>
+                <li>
+                  {t("home.authSecret.cf.2")}
+                  <ul className="mt-1 space-y-0.5 list-disc pl-5">
+                    <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm1")}</code></li>
+                    <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm2")}</code></li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
+  );
+}
+
 function fieldError(parsed: { success: boolean; error?: { issues: Array<{ path: Array<string | number | symbol>; message: string }> } }, field: string): string | undefined {
   if (parsed.success || !parsed.error) return undefined;
   return parsed.error.issues.find(i => i.path[0] === field)?.message;
@@ -1159,6 +1294,12 @@ function splitEntries(value: string): string[] {
     .split(/[\r\n,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+export function translatedError(msg: string | undefined, t: (key: LocaleKey, params?: Record<string, string | number>) => string): string | undefined {
+  if (!msg) return undefined;
+  if (msg.startsWith("validation.")) return t(msg as LocaleKey);
+  return msg;
 }
 
 export function parseExcludeDomains(value: string): string[] {

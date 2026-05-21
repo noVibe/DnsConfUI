@@ -41,14 +41,13 @@ export const locale = {
   "points.run.text": "Geo-blocking, ad, and tracker rule updates run every night via GitHub Actions.",
 
   "wizard.setup": "Configuration setup",
-  "wizard.setupDesc": "Setup the DnsConf GitHub Actions secrets and variables in one pass.",
   "wizard.disconnect": "Disconnect",
   "wizard.quick": "Quick",
   "wizard.expert": "Expert",
   "wizard.noProvider": "Could not determine DNS provider. Check CLIENT_ID.",
   "wizard.fillAll": "Fill in all profile credentials.",
   "wizard.enableFeature": "Enable at least one feature.",
-  "wizard.mixedProvider": "All profiles must use the same DNS provider in Quick mode.",
+  "wizard.mixedProvider": "In Quick mode, all profiles must use the same DNS provider.",
   "wizard.fork": "Fork repository",
   "wizard.secrets": "Secrets & variables",
   "wizard.run": "Run workflow",
@@ -150,6 +149,10 @@ export const locale = {
   "auth.permissions": "You will grant repo, workflow, and read:user permissions so the browser can create your DnsConf fork and configure Actions.",
   "auth.start": "Start GitHub connection",
   "auth.restart": "Restart authorization",
+
+  "validation.clientIdRequired": "Client identifier is required",
+  "validation.authSecretRequired": "Provider API secret is required",
+  "validation.clientIdFormat": "DNS Client ID must be:\n6 characters (NextDNS)\n32 characters (Cloudflare)",
 
   "common.loading": "Loading\u2026",
   "common.error": "Error",

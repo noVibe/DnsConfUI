@@ -43,14 +43,13 @@ export const locale: Record<LocaleKey, string> = {
   "points.run.text": "Обновление правил геоблокировки, правил блокировки рекламы и трекеров будет осуществляться каждую ночь через механизм GitHub Actions",
 
   "wizard.setup": "Настройка конфигурации",
-  "wizard.setupDesc": "Настройте секреты и переменные GitHub Actions для DnsConf за один проход.",
   "wizard.disconnect": "Отключиться",
   "wizard.quick": "Быстрая",
   "wizard.expert": "Эксперт",
   "wizard.noProvider": "Не удалось определить DNS-провайдера. Проверьте CLIENT_ID.",
   "wizard.fillAll": "Заполните учётные данные всех профилей.",
   "wizard.enableFeature": "Включите хотя бы одну функцию.",
-  "wizard.mixedProvider": "В быстром режиме все профили должны использовать одного провайдера.",
+  "wizard.mixedProvider": "В быстром режиме все профили должны принадлежать одному DNS-провайдеру.",
   "wizard.fork": "Форк репозитория",
   "wizard.secrets": "Секреты и переменные",
   "wizard.run": "Запуск workflow",
@@ -152,6 +151,10 @@ export const locale: Record<LocaleKey, string> = {
   "auth.permissions": "Вы предоставите права repo, workflow и read:user, чтобы браузер мог создать форк DnsConf и настроить Actions.",
   "auth.start": "Начать подключение к GitHub",
   "auth.restart": "Перезапустить авторизацию",
+
+  "validation.clientIdRequired": "Требуется ID клиента",
+  "validation.authSecretRequired": "Требуется ключ API провайдера",
+  "validation.clientIdFormat": "ID клиента DNS должен быть:\n6 символов (NextDNS)\n32 символа (Cloudflare)",
 
   "common.loading": "Загрузка\u2026",
   "common.error": "Ошибка",

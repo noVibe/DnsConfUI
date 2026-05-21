@@ -3,8 +3,8 @@ import { z } from "zod";
 export const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
 
 export const profileSchema = z.object({
-  clientId: z.string().trim().min(1, "Client identifier is required"),
-  authSecret: z.string().trim().min(1, "Provider API secret is required"),
+  clientId: z.string().trim().min(1, "validation.clientIdRequired"),
+  authSecret: z.string().trim().min(1, "validation.authSecretRequired"),
   provider: dnsProviderSchema.or(z.literal(""))
 });
 
@@ -24,7 +24,7 @@ export const dnsConfConfigSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["profiles", index, "clientId"],
-          message: "DNS Client ID must be:\n6 characters (NextDNS)\n32 characters (Cloudflare)"
+          message: "validation.clientIdFormat"
         });
       }
     }

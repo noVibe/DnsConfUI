@@ -8,7 +8,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { useTheme } from "@/lib/theme/context";
 
 export default function Home() {
-  const { token } = useAuth();
+  const { token, setToken } = useAuth();
   const { t, locale, setLocale } = useLocale();
   const { theme, toggleTheme } = useTheme();
 
@@ -57,6 +57,15 @@ export default function Home() {
                 {theme === "light" ? <Moon className="size-3.5" aria-hidden="true" /> : <Sun className="size-3.5" aria-hidden="true" />}
                 {theme === "light" ? t("home.theme.dark") : t("home.theme.light")}
               </button>
+              {token ? (
+                  <button
+                    type="button"
+                    onClick={() => setToken(null)}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 hover:text-ink hover:border-ink/30 transition-colors"
+                  >
+                    {t("wizard.disconnect")}
+                  </button>
+              ) : null}
             </div>
           </div>
           <div className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
@@ -120,73 +129,6 @@ export default function Home() {
               </div>
             ) : null}
           </details>
-
-          {token ? (
-            <details className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
-                {t("home.whereCreds")}
-                <ChevronDown className="size-4 text-moss" aria-hidden="true" />
-              </summary>
-              <div className="mt-4 space-y-3 text-sm leading-6 text-ink/72">
-
-                <details className="rounded-md border border-line bg-white">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
-                    {t("home.nextdns")}
-                    <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
-                  </summary>
-                  <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
-                    <div className="rounded-md bg-paper p-3">
-                      <div className="font-medium text-ink">{t("home.clientId")}</div>
-                      <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
-                        <li>{t("home.clientId.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io" target="_blank" rel="noreferrer">{t("home.nextdnsSetupPage")}</a></li>
-                        <li>{t("home.clientId.nextdns.2")}</li>
-                      </ol>
-                    </div>
-                    <div className="rounded-md bg-paper p-3">
-                      <div className="font-medium text-ink">{t("home.authSecret")}</div>
-                      <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
-                        <li>{t("home.authSecret.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io/account" target="_blank" rel="noreferrer">my.nextdns.io/account</a></li>
-                        <li>{t("home.authSecret.nextdns.2")}</li>
-                      </ol>
-                    </div>
-                  </div>
-                </details>
-
-                <details className="rounded-md border border-line bg-white">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
-                    {t("home.cloudflare")}
-                    <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
-                  </summary>
-                  <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
-                    <div className="rounded-md bg-paper p-3">
-                      <div className="font-medium text-ink">{t("home.clientId")}</div>
-                      <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
-                        <li>{t("home.clientId.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">{t("home.dashCloudflare")}</a></li>
-                        <li>{t("home.clientId.cf.2")}</li>
-                        <li>{t("home.clientId.cf.3")}</li>
-                        <li>{t("home.clientId.cf.4")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/?to=/:account/workers" target="_blank" rel="noreferrer">dash.cloudflare.com/?to=/:account/workers</a></li>
-                        <li>{t("home.clientId.cf.5")}</li>
-                      </ol>
-                    </div>
-                    <div className="rounded-md bg-paper p-3">
-                      <div className="font-medium text-ink">{t("home.authSecret")}</div>
-                      <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
-                        <li>{t("home.authSecret.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer">dash.cloudflare.com/profile/api-tokens</a></li>
-                        <li>
-                          {t("home.authSecret.cf.2")}
-                          <ul className="mt-1 space-y-0.5 list-disc pl-5">
-                            <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm1")}</code></li>
-                            <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm2")}</code></li>
-                          </ul>
-                        </li>
-                      </ol>
-                    </div>
-                  </div>
-                </details>
-
-              </div>
-            </details>
-          ) : null}
 
           <div className="flex items-center gap-2 text-xs text-ink/40">
             <span>GitHub:</span>
