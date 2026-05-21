@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, ChevronDown, GitBranch, Info, Loader2, Play, Plus, Star, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type UseFormSetValue } from "react-hook-form";
 import {
   buildDnsConfPayload,
@@ -37,6 +37,25 @@ export function SetupWizard() {
   const [blockAds, setBlockAds] = useState(true);
   const [disguisedTrackers, setDisguisedTrackers] = useState(true);
   const [nativeTracking, setNativeTracking] = useState(true);
+
+  const handleGeoHideChange = useCallback((checked: boolean) => {
+    setGeoHideChecked(checked);
+    if (!checked && !malwChecked) {
+      setGeoBlock(false);
+    } else if (checked && !geoBlock) {
+      setGeoBlock(true);
+    }
+  }, [geoBlock, malwChecked]);
+
+  const handleMalwChange = useCallback((checked: boolean) => {
+    setMalwChecked(checked);
+    if (!checked && !geoHideChecked) {
+      setGeoBlock(false);
+    } else if (checked && !geoBlock) {
+      setGeoBlock(true);
+    }
+  }, [geoBlock, geoHideChecked]);
+
   const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
@@ -402,8 +421,8 @@ export function SetupWizard() {
             disguisedTrackers={disguisedTrackers}
             nativeTracking={nativeTracking}
             onGeoBlockChange={setGeoBlock}
-            onGeoHideChange={setGeoHideChecked}
-            onMalwChange={setMalwChecked}
+            onGeoHideChange={handleGeoHideChange}
+            onMalwChange={handleMalwChange}
             onBlockAdsChange={setBlockAds}
             onDisguisedTrackersChange={setDisguisedTrackers}
             onNativeTrackingChange={setNativeTracking}
