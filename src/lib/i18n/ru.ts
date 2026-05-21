@@ -153,8 +153,8 @@ export const locale: Record<LocaleKey, string> = {
   "auth.start": "Начать подключение к GitHub",
   "auth.restart": "Перезапустить авторизацию",
 
-  "validation.clientIdRequired": "Требуется идентификатор клиента",
-  "validation.authSecretRequired": "Требуется секрет API провайдера",
+  "validation.clientIdRequired": "Требуется ID клиента",
+  "validation.authSecretRequired": "Требуется ключ API провайдера",
   "validation.clientIdFormat": "ID клиента DNS должен быть:\n6 символов (NextDNS)\n32 символа (Cloudflare)",
 
   "common.loading": "Загрузка\u2026",
