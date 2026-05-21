@@ -21,16 +21,16 @@
 
 .dark {
   color-scheme: dark;
-  background: #0f1419;
   color: #e1e8ed;
+  --color-white: #1e293b;
+  --color-paper: #253348;
   --color-ink: #e1e8ed;
-  --color-paper: #1a2332;
   --color-moss: #6a9d7a;
   --color-mint: #1a2e24;
   --color-coral: #e88b6a;
   --color-steel: #6a9db8;
-  --color-line: #2a3545;
-  --shadow-soft: 0 18px 60px rgb(0 0 0 / 0.4);
+  --color-line: #334155;
+  --shadow-soft: 0 18px 60px rgb(0 0 0 / 0.5);
 }
 
 * {
