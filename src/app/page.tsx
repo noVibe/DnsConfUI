@@ -39,7 +39,7 @@ export default function Home() {
     <main className="min-h-screen">
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-5 py-6 md:grid-cols-[0.62fr_1.38fr] md:px-8 md:py-8">
         <div className="flex flex-col gap-5">
-          <div className="rounded-lg border border-moss/30 bg-mint/70 p-4 shadow-sm dark:border-moss/30 dark:bg-paper">
+          <div className="rounded-lg border border-moss/30 bg-mint/70 p-4 shadow-sm dark:bg-paper">
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"

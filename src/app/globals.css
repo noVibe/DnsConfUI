@@ -52,6 +52,10 @@ body {
     linear-gradient(180deg, #0f1419 0%, #1a2332 100%);
 }
 
+.dark .rounded-lg {
+  border-color: color-mix(in srgb, #d4a853 25%, transparent) !important;
+}
+
 button,
 input,
 select,
