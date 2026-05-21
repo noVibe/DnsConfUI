@@ -46,12 +46,27 @@ export function SetupWizard() {
 
   const hasToggles = geoBlock || blockAds || disguisedTrackers || nativeTracking;
 
+  const mixedProviderIndices = useMemo(() => {
+    const profiles = values.profiles ?? [];
+    if (profiles.length < 2) return new Set<number>();
+    const refProvider = profiles[0]?.provider;
+    if (!refProvider) return new Set<number>();
+    const indices = new Set<number>();
+    for (let i = 1; i < profiles.length; i++) {
+      if (profiles[i]?.provider && profiles[i]?.provider !== refProvider) {
+        indices.add(i);
+      }
+    }
+    return indices;
+  }, [values.profiles]);
+
   const canQuickProvision = useMemo(() => {
     const profiles = values.profiles ?? [];
     if (profiles.length === 0) return false;
+    if (mixedProviderIndices.size > 0) return false;
     const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
     return allFilled && hasToggles && !!profiles[0]?.provider;
-  }, [values.profiles, hasToggles]);
+  }, [values.profiles, hasToggles, mixedProviderIndices]);
 
   async function quickProvision() {
     if (!token) return;
@@ -379,6 +394,7 @@ export function SetupWizard() {
             setValue={form.setValue}
             profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
             profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
+            mixedProviderIndices={mixedProviderIndices}
             geoBlock={geoBlock}
             geoHideChecked={geoHideChecked}
             malwChecked={malwChecked}
@@ -416,12 +432,14 @@ function ProfilesSection({
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
+  mixedProviderIndices,
   simplified
 }: {
   profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  mixedProviderIndices?: Set<number>;
   simplified?: boolean;
 }) {
   const { t } = useLocale();
@@ -565,6 +583,11 @@ function ProfilesSection({
                   <ScriptBehaviour provider={profiles[selected].provider as "cloudflare" | "nextdns"} />
                 </>
               )}
+            </div>
+          ) : null}
+          {simplified && mixedProviderIndices?.has(selected) ? (
+            <div className="mt-2 rounded-md border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral">
+              {t('wizard.mixedProvider')}
             </div>
           ) : null}
         </div>
@@ -949,6 +972,7 @@ function QuickModeUI({
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
+  mixedProviderIndices,
   geoBlock,
   geoHideChecked,
   malwChecked,
@@ -980,6 +1004,7 @@ function QuickModeUI({
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  mixedProviderIndices: Set<number>;
   geoBlock: boolean;
   geoHideChecked: boolean;
   malwChecked: boolean;
@@ -1018,6 +1043,7 @@ function QuickModeUI({
             setValue={setValue}
             profileClientIdErrors={profileClientIdErrors}
             profileSecretErrors={profileSecretErrors}
+            mixedProviderIndices={mixedProviderIndices}
             simplified
           />
 
