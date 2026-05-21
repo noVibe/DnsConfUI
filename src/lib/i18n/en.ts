@@ -151,6 +151,10 @@ export const locale = {
   "auth.start": "Start GitHub connection",
   "auth.restart": "Restart authorization",
 
+  "validation.clientIdRequired": "Client identifier is required",
+  "validation.authSecretRequired": "Provider API secret is required",
+  "validation.clientIdFormat": "DNS Client ID must be:\n6 characters (NextDNS)\n32 characters (Cloudflare)",
+
   "common.loading": "Loading\u2026",
   "common.error": "Error",
   "common.save": "Save",

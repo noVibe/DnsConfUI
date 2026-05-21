@@ -11,6 +11,7 @@ import {
   type DnsConfConfig,
   type Profile
 } from "@/domain/dnsconf-config";
+import type { LocaleKey } from "@/lib/i18n/en";
 import { GEOBLOCK_HOSTS_URL, ADBLOCK_HOSTS_URL, OISD_SMALL_URL } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
@@ -565,10 +566,10 @@ function ProfilesSection({
               <X className="size-4" />
             </button>
           </div>
-          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={profileClientIdErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={translatedError(profileClientIdErrors?.find(e => e.index === selected)?.message, t)}>
             <input className={inputClass} autoComplete="off" value={profiles[selected].clientId} onChange={(e) => update(selected, "clientId", e.target.value)} />
           </Field>
-          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={profileSecretErrors?.find(e => e.index === selected)?.message}>
+          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={translatedError(profileSecretErrors?.find(e => e.index === selected)?.message, t)}>
             <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
           </Field>
           {simplified && credStatus[selected] ? (
@@ -1202,6 +1203,12 @@ function splitEntries(value: string): string[] {
     .split(/[\r\n,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+export function translatedError(msg: string | undefined, t: (key: LocaleKey, params?: Record<string, string | number>) => string): string | undefined {
+  if (!msg) return undefined;
+  if (msg.startsWith("validation.")) return t(msg as LocaleKey);
+  return msg;
 }
 
 export function parseExcludeDomains(value: string): string[] {
