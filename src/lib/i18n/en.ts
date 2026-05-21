@@ -48,7 +48,7 @@ export const locale = {
   "wizard.noProvider": "Could not determine DNS provider. Check CLIENT_ID.",
   "wizard.fillAll": "Fill in all profile credentials.",
   "wizard.enableFeature": "Enable at least one feature.",
-  "wizard.mixedProvider": "All profiles must use the same DNS provider in Quick mode.",
+  "wizard.mixedProvider": "In Quick mode, all profiles must use the same DNS provider.",
   "wizard.fork": "Fork repository",
   "wizard.secrets": "Secrets & variables",
   "wizard.run": "Run workflow",

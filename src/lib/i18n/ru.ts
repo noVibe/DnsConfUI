@@ -50,7 +50,7 @@ export const locale: Record<LocaleKey, string> = {
   "wizard.noProvider": "Не удалось определить DNS-провайдера. Проверьте CLIENT_ID.",
   "wizard.fillAll": "Заполните учётные данные всех профилей.",
   "wizard.enableFeature": "Включите хотя бы одну функцию.",
-  "wizard.mixedProvider": "В быстром режиме все профили должны использовать одного провайдера.",
+  "wizard.mixedProvider": "В быстром режиме все профили должны принадлежать одному DNS-провайдеру.",
   "wizard.fork": "Форк репозитория",
   "wizard.secrets": "Секреты и переменные",
   "wizard.run": "Запуск workflow",
