@@ -4,12 +4,14 @@ import { Check, Copy, GitBranch, KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { requestGitHubDeviceCode, pollGitHubDeviceToken, type DeviceCodeResponse } from "@/lib/github/device-flow";
 import { useAuth } from "./auth-provider";
+import { useLocale } from "@/lib/i18n/context";
 import { Button, SecondaryButton } from "./ui";
 
 type AuthState = "idle" | "starting" | "waiting" | "done" | "error";
 
 export function DeviceAuthPanel() {
   const { setToken } = useAuth();
+  const { t } = useLocale();
   const [device, setDevice] = useState<DeviceCodeResponse | null>(null);
   const [state, setState] = useState<AuthState>("idle");
   const [message, setMessage] = useState<string>("");
@@ -29,7 +31,7 @@ export function DeviceAuthPanel() {
   async function start() {
     if (!clientId) {
       setState("error");
-      setMessage("NEXT_PUBLIC_GITHUB_CLIENT_ID is required to start GitHub authorization.");
+      setMessage(t('auth.clientIdRequired'));
       return;
     }
 
@@ -44,7 +46,7 @@ export function DeviceAuthPanel() {
       schedulePoll(response.device_code, response.interval);
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "GitHub authorization could not be started.");
+      setMessage(error instanceof Error ? error.message : t('auth.couldNotStart'));
     }
   }
 
@@ -80,10 +82,10 @@ export function DeviceAuthPanel() {
         }
 
         setState("error");
-        setMessage(result.error_description ?? "GitHub authorization was not completed.");
+        setMessage(result.error_description ?? t('auth.notCompleted'));
       } catch {
         setState("error");
-        setMessage("GitHub authorization polling failed.");
+        setMessage(t('auth.pollingFailed'));
       }
     }, interval * 1000);
   }
@@ -96,11 +98,10 @@ export function DeviceAuthPanel() {
         </div>
         <div>
           <h2 id="connect-title" className="text-2xl font-semibold text-ink">
-            Connect GitHub
+            {t('auth.connect')}
           </h2>
           <p className="mt-2 text-sm leading-6 text-ink/70">
-            Authorization uses GitHub Device Flow. The app never uses an OAuth client secret and
-            never stores the token after refresh.
+            {t('auth.deviceFlowDesc')}
           </p>
         </div>
       </div>
@@ -108,18 +109,15 @@ export function DeviceAuthPanel() {
       <div className="mt-6 rounded-lg border border-line bg-paper p-4">
         {!clientId ? (
           <div className="space-y-3">
-            <div className="text-base font-semibold text-ink">Developer setup required</div>
+            <div className="text-base font-semibold text-ink">{t('auth.devSetup')}</div>
             <p className="text-sm leading-6 text-ink/70">
-              This local preview is missing the public GitHub client ID. In production, users do
-              not create OAuth apps or configure GitHub developer settings; they only press
-              Connect GitHub and approve access.
+              {t('auth.devSetupDesc')}
             </p>
             <div className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink/72">
-              NEXT_PUBLIC_GITHUB_CLIENT_ID=your_client_id
+              {t('auth.envVar')}
             </div>
             <p className="text-sm leading-6 text-ink/70">
-              For local development, the app owner creates one GitHub OAuth App, enables Device
-              Flow for it, and puts its client ID in `.env.local`.
+              {t('auth.localDevDesc')}
             </p>
             <a
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-steel"
@@ -128,13 +126,13 @@ export function DeviceAuthPanel() {
               rel="noreferrer"
             >
               <GitBranch className="size-4" aria-hidden="true" />
-              Open GitHub developer settings
+              {t('auth.openGhDev')}
             </a>
           </div>
         ) : device ? (
           <div className="space-y-4">
             <div>
-              <div className="text-sm font-medium text-ink/70">Enter this code on GitHub</div>
+              <div className="text-sm font-medium text-ink/70">{t('auth.enterCode')}</div>
               <button
                 type="button"
                 onClick={() => {
@@ -150,9 +148,9 @@ export function DeviceAuthPanel() {
                 </span>
               </button>
               {copied ? (
-                <div className="mt-1 text-right text-xs text-moss">Copied!</div>
+                <div className="mt-1 text-right text-xs text-moss">{t('auth.copied')}</div>
               ) : (
-                <div className="mt-1 text-right text-xs text-ink/50">Click to copy</div>
+                <div className="mt-1 text-right text-xs text-ink/50">{t('auth.clickToCopy')}</div>
               )}
             </div>
             <a
@@ -162,18 +160,17 @@ export function DeviceAuthPanel() {
               rel="noreferrer"
             >
               <KeyRound className="size-4" aria-hidden="true" />
-              Open GitHub verification
+              {t('auth.openGhVerification')}
             </a>
             <div className="flex items-center gap-2 text-sm text-ink/65">
               {state === "waiting" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-              {state === "waiting" ? "Code copied — click the button above to open GitHub and paste it" : null}
+              {state === "waiting" ? t('auth.codeCopied') : null}
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm leading-6 text-ink/70">
-              You will grant `repo`, `workflow`, and `read:user` permissions so the browser can
-              create your DnsConf fork and configure Actions.
+              {t('auth.permissions')}
             </p>
             <Button className="w-full" onClick={start} disabled={state === "starting"}>
               {state === "starting" ? (
@@ -181,7 +178,7 @@ export function DeviceAuthPanel() {
               ) : (
                 <GitBranch className="size-4" aria-hidden="true" />
               )}
-              {state === "starting" ? "Contacting GitHub" : "Start GitHub connection"}
+              {state === "starting" ? t('wizard.connecting') : t('auth.start')}
             </Button>
           </div>
         )}
@@ -195,7 +192,7 @@ export function DeviceAuthPanel() {
 
       {device ? (
         <SecondaryButton className="mt-4 w-full" onClick={start}>
-          Restart authorization
+          {t('auth.restart')}
         </SecondaryButton>
       ) : null}
     </section>
