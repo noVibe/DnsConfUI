@@ -41,7 +41,6 @@ export const locale = {
   "points.run.text": "Geo-blocking, ad, and tracker rule updates run every night via GitHub Actions.",
 
   "wizard.setup": "Configuration setup",
-  "wizard.setupDesc": "Setup the DnsConf GitHub Actions secrets and variables in one pass.",
   "wizard.disconnect": "Disconnect",
   "wizard.quick": "Quick",
   "wizard.expert": "Expert",

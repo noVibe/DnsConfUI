@@ -43,7 +43,6 @@ export const locale: Record<LocaleKey, string> = {
   "points.run.text": "Обновление правил геоблокировки, правил блокировки рекламы и трекеров будет осуществляться каждую ночь через механизм GitHub Actions",
 
   "wizard.setup": "Настройка конфигурации",
-  "wizard.setupDesc": "Настройте секреты и переменные GitHub Actions для DnsConf за один проход.",
   "wizard.disconnect": "Отключиться",
   "wizard.quick": "Быстрая",
   "wizard.expert": "Эксперт",

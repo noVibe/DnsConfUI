@@ -17,10 +17,10 @@ import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api"
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { useAuth } from "./auth-provider";
-import { Button, cn, Field, SecondaryButton, inputClass, textareaClass } from "./ui";
+import { Button, cn, Field, inputClass, textareaClass } from "./ui";
 
 export function SetupWizard() {
-  const { token, setToken } = useAuth();
+  const { token } = useAuth();
   const { t } = useLocale();
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -58,6 +58,7 @@ export function SetupWizard() {
   }, [geoBlock, geoHideChecked]);
 
   const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
+  const [allProfilesValid, setAllProfilesValid] = useState(false);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
   const normalizedValues = normalizeValues(values);
@@ -85,8 +86,8 @@ export function SetupWizard() {
     if (profiles.length === 0) return false;
     if (mixedProviderIndices.size > 0) return false;
     const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
-    return allFilled && hasToggles && !!profiles[0]?.provider;
-  }, [values.profiles, hasToggles, mixedProviderIndices]);
+    return allFilled && hasToggles && !!profiles[0]?.provider && allProfilesValid;
+  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid]);
 
   async function quickProvision() {
     if (!token) return;
@@ -329,54 +330,17 @@ export function SetupWizard() {
 
   return (
     <section aria-labelledby="setup-title">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 id="setup-title" className="text-2xl font-semibold text-ink">
-            {t('wizard.setup')}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-ink/70">
-            {t('wizard.setupDesc')}
-          </p>
-        </div>
-        <SecondaryButton onClick={() => setToken(null)}>{t('wizard.disconnect')}</SecondaryButton>
-      </div>
-
-      <div className="mt-4 flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
-        <button
-          type="button"
-          onClick={() => setMode("quick")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition",
-            mode === "quick"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink/60 hover:text-ink"
-          )}
-          >
-            {t('wizard.quick')}
-          </button>
-        <button
-          type="button"
-          onClick={() => setMode("expert")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition",
-            mode === "expert"
-              ? "bg-white text-ink shadow-sm"
-              : "text-ink/60 hover:text-ink"
-          )}
-        >
-          {t('wizard.expert')}
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 id="setup-title" className="text-2xl font-semibold text-ink">
+          {t('wizard.setup')}
+        </h2>
+        <ModeTabs mode={mode} setMode={setMode} t={t} />
       </div>
 
       {mode === "expert" ? (
         <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5">
-            <ProfilesSection
-              profiles={values.profiles ?? []}
-              setValue={form.setValue}
-              profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
-              profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
-            />
+            <CredsGuide t={t} />
             <SourcesSection
               blocklists={values.blocklists}
               redirects={values.redirects}
@@ -385,6 +349,13 @@ export function SetupWizard() {
               blocklistsError={fieldError(parsed, "blocklists")}
               redirectsError={fieldError(parsed, "redirects")}
               redirectExclusionsError={fieldError(parsed, "redirectExclusions")}
+            />
+            <ProfilesSection
+              profiles={values.profiles ?? []}
+              setValue={form.setValue}
+              profileClientIdErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "clientId").map(i => ({ index: i.path[1] as number, message: i.message }))}
+              profileSecretErrors={parsed.success ? undefined : parsed.error.issues.filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === "authSecret").map(i => ({ index: i.path[1] as number, message: i.message }))}
+              onValidChange={setAllProfilesValid}
             />
           </div>
 
@@ -395,7 +366,7 @@ export function SetupWizard() {
               message={message}
               result={result}
               onProvision={provision}
-              disabled={!parsed.success || status === "running"}
+              disabled={!parsed.success || status === "running" || !allProfilesValid}
               starred={starred}
               starring={starring}
               onStar={handleStar}
@@ -409,6 +380,8 @@ export function SetupWizard() {
       ) : (
         <div className="mt-6">
           <QuickModeUI
+            mode={mode}
+            setMode={setMode}
             profiles={values.profiles ?? []}
             providerLabel={providerLabel}
             setValue={form.setValue}
@@ -427,6 +400,7 @@ export function SetupWizard() {
             onBlockAdsChange={setBlockAds}
             onDisguisedTrackersChange={setDisguisedTrackers}
             onNativeTrackingChange={setNativeTracking}
+            onProfilesValidChange={setAllProfilesValid}
             quickSteps={quickSteps}
             onProvision={quickProvision}
             status={status}
@@ -453,7 +427,8 @@ function ProfilesSection({
   profileClientIdErrors,
   profileSecretErrors,
   mixedProviderIndices,
-  simplified
+  simplified,
+  onValidChange
 }: {
   profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
@@ -461,6 +436,7 @@ function ProfilesSection({
   profileSecretErrors?: Array<{ index: number; message: string }>;
   mixedProviderIndices?: Set<number>;
   simplified?: boolean;
+  onValidChange?: (v: boolean) => void;
 }) {
   const { t } = useLocale();
   const [selected, setSelected] = useState(0);
@@ -469,7 +445,6 @@ function ProfilesSection({
   useEffect(() => () => { Object.values(validateTimers.current).forEach(clearTimeout); }, []);
 
   useEffect(() => {
-    if (!simplified) return;
     const p = profiles[selected];
     const detected = p?.clientId?.length === 32 ? "cloudflare" : p?.clientId?.length === 6 ? "nextdns" : null;
     if (!detected || !p?.authSecret?.trim() || credStatus[selected]) return;
@@ -486,13 +461,21 @@ function ProfilesSection({
     validateTimers.current[selected] = timer;
   }, [selected, simplified]);
 
+  useEffect(() => {
+    if (!onValidChange) return;
+    const allValid = profiles.every((p, i) => {
+      if (!p.clientId?.trim() || !p.authSecret?.trim()) return true;
+      return credStatus[i]?.status === "valid";
+    });
+    onValidChange(allValid);
+  }, [credStatus, profiles, onValidChange]);
+
   function update(index: number, field: "clientId" | "authSecret" | "provider", value: string) {
     const next = profiles.map((p, i) =>
       i === index ? { ...p, [field]: value } : p
     ) as DnsConfConfig["profiles"];
     setValue("profiles", next, { shouldDirty: true, shouldValidate: true });
 
-    if (!simplified) return;
     if (field !== "clientId" && field !== "authSecret") return;
 
     const timer = validateTimers.current[index];
@@ -987,6 +970,8 @@ function ToggleSwitch({
 }
 
 function QuickModeUI({
+  mode,
+  setMode,
   profiles,
   providerLabel,
   setValue,
@@ -1005,6 +990,7 @@ function QuickModeUI({
   onBlockAdsChange,
   onDisguisedTrackersChange,
   onNativeTrackingChange,
+  onProfilesValidChange,
   onProvision,
   status,
   message,
@@ -1019,6 +1005,8 @@ function QuickModeUI({
   needsSync,
   onSync
 }: {
+  mode: "quick" | "expert";
+  setMode: (m: "quick" | "expert") => void;
   profiles: DnsConfConfig["profiles"];
   providerLabel: string | null;
   setValue: UseFormSetValue<DnsConfConfig>;
@@ -1037,6 +1025,7 @@ function QuickModeUI({
   onBlockAdsChange: (v: boolean) => void;
   onDisguisedTrackersChange: (v: boolean) => void;
   onNativeTrackingChange: (v: boolean) => void;
+  onProfilesValidChange: (v: boolean) => void;
   onProvision: () => void;
   status: "idle" | "running" | "done" | "error";
   message: string;
@@ -1058,6 +1047,7 @@ function QuickModeUI({
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-5">
+        <CredsGuide t={t} />
          <ProfilesSection
             profiles={profiles}
             setValue={setValue}
@@ -1065,6 +1055,7 @@ function QuickModeUI({
             profileSecretErrors={profileSecretErrors}
             mixedProviderIndices={mixedProviderIndices}
             simplified
+            onValidChange={onProfilesValidChange}
           />
 
         {providerLabel ? (
@@ -1190,6 +1181,106 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
       <div className="font-medium text-ink">{label}</div>
       <div className="mt-1 whitespace-pre-wrap rounded-md bg-white px-3 py-2">{value}</div>
     </div>
+  );
+}
+
+function ModeTabs({ mode, setMode, t }: { mode: "quick" | "expert"; setMode: (m: "quick" | "expert") => void; t: (key: LocaleKey, params?: Record<string, string | number>) => string }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
+      <button
+        type="button"
+        onClick={() => setMode("quick")}
+        className={cn(
+          "rounded-md px-3 py-1.5 text-sm font-medium transition",
+          mode === "quick"
+            ? "bg-white text-ink shadow-sm"
+            : "text-ink/60 hover:text-ink"
+        )}
+      >
+        {t('wizard.quick')}
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("expert")}
+        className={cn(
+          "rounded-md px-3 py-1.5 text-sm font-medium transition",
+          mode === "expert"
+            ? "bg-white text-ink shadow-sm"
+            : "text-ink/60 hover:text-ink"
+        )}
+      >
+        {t('wizard.expert')}
+      </button>
+    </div>
+  );
+}
+
+function CredsGuide({ t }: { t: (key: LocaleKey, params?: Record<string, string | number>) => string }) {
+  return (
+    <details className="rounded-lg border border-moss/30 bg-white p-4 shadow-soft">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">
+        {t("home.whereCreds")}
+        <ChevronDown className="size-4 text-moss" aria-hidden="true" />
+      </summary>
+      <div className="mt-4 space-y-3 text-sm leading-6 text-ink/72">
+
+        <details className="rounded-md border border-line bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
+            {t("home.nextdns")}
+            <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.clientId")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.clientId.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io" target="_blank" rel="noreferrer">{t("home.nextdnsSetupPage")}</a></li>
+                <li>{t("home.clientId.nextdns.2")}</li>
+              </ol>
+            </div>
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.authSecret")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.authSecret.nextdns.1")} <a className="text-steel underline hover:text-ink" href="https://my.nextdns.io/account" target="_blank" rel="noreferrer">my.nextdns.io/account</a></li>
+                <li>{t("home.authSecret.nextdns.2")}</li>
+              </ol>
+            </div>
+          </div>
+        </details>
+
+        <details className="rounded-md border border-line bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ink">
+            {t("home.cloudflare")}
+            <ChevronDown className="size-3.5 text-moss" aria-hidden="true" />
+          </summary>
+          <div className="border-t border-line px-4 pb-4 pt-3 space-y-3">
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.clientId")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.clientId.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com" target="_blank" rel="noreferrer">{t("home.dashCloudflare")}</a></li>
+                <li>{t("home.clientId.cf.2")}</li>
+                <li>{t("home.clientId.cf.3")}</li>
+                <li>{t("home.clientId.cf.4")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/?to=/:account/workers" target="_blank" rel="noreferrer">dash.cloudflare.com/?to=/:account/workers</a></li>
+                <li>{t("home.clientId.cf.5")}</li>
+              </ol>
+            </div>
+            <div className="rounded-md bg-paper p-3">
+              <div className="font-medium text-ink">{t("home.authSecret")}</div>
+              <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-ink/70">
+                <li>{t("home.authSecret.cf.1")} <a className="text-steel underline hover:text-ink" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noreferrer">dash.cloudflare.com/profile/api-tokens</a></li>
+                <li>
+                  {t("home.authSecret.cf.2")}
+                  <ul className="mt-1 space-y-0.5 list-disc pl-5">
+                    <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm1")}</code></li>
+                    <li><code className="rounded bg-paper px-1 text-xs">{t("home.authSecret.cf.perm2")}</code></li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </details>
   );
 }
 
