@@ -28,7 +28,6 @@ export const locale = {
   "home.authSecret.cf.perm1": "Account \u203a Zero Trust : Edit",
   "home.authSecret.cf.perm2": "Account \u203a Account Firewall Access Rules : Edit",
   "home.footer": "GitHub: noVibe/DnsConfUI",
-  "home.settings": "Settings",
   "home.theme.light": "Light",
   "home.theme.dark": "Dark",
 

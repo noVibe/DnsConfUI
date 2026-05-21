@@ -39,11 +39,8 @@ export default function Home() {
     <main className="min-h-screen">
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-5 py-6 md:grid-cols-[0.62fr_1.38fr] md:px-8 md:py-8">
         <div className="flex flex-col gap-5">
-          <div className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
-            <div className="text-xs font-medium text-ink/40 uppercase tracking-wider">
-              {t("home.settings")}
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="rounded-lg border border-moss/15 bg-mint/40 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
