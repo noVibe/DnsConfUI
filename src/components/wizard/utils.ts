@@ -28,7 +28,7 @@ export function extractProfileErrors(parsed: { success: boolean; error?: { issue
 
 export function parseExcludeDomains(value: string): string[] {
   return value
-    .split(/[\s,]+/)
+    .split(/[\s,;/]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
