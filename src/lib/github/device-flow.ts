@@ -6,7 +6,7 @@ export type DeviceCodeResponse = {
   interval: number;
 };
 
-export type DeviceTokenResponse = {
+type DeviceTokenResponse = {
   access_token: string;
   token_type: string;
   scope: string;
@@ -53,7 +53,7 @@ export async function pollGitHubDeviceToken(
   return response.json();
 }
 
-async function readError(response: Response, fallback: string): Promise<string> {
+export async function readError(response: Response, fallback: string): Promise<string> {
   try {
     const data = (await response.json()) as { error?: string; message?: string };
     return data.message ?? data.error ?? fallback;

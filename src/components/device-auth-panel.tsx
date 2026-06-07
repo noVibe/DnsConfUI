@@ -16,7 +16,7 @@ export function DeviceAuthPanel() {
   const [state, setState] = useState<AuthState>("idle");
   const [message, setMessage] = useState<string>("");
   const pollingRef = useRef<number | null>(null);
-  const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
   useEffect(() => {
     return () => {
@@ -29,7 +29,7 @@ export function DeviceAuthPanel() {
   const [copied, setCopied] = useState(false);
 
   async function start() {
-    if (!clientId) {
+    if (!gitHubClientId) {
       setState("error");
       setMessage(t('auth.clientIdRequired'));
       return;
@@ -58,7 +58,7 @@ export function DeviceAuthPanel() {
 
   function schedulePoll(deviceCode: string, interval: number) {
     pollingRef.current = window.setTimeout(async () => {
-      if (!clientId) {
+      if (!gitHubClientId) {
         return;
       }
 
@@ -107,7 +107,7 @@ export function DeviceAuthPanel() {
       </div>
 
       <div className="mt-6 rounded-lg border border-line bg-paper p-4">
-        {!clientId ? (
+        {!gitHubClientId ? (
           <div className="space-y-3">
             <div className="text-base font-semibold text-ink">{t('auth.devSetup')}</div>
             <p className="text-sm leading-6 text-ink/70">

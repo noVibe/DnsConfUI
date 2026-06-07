@@ -37,4 +37,16 @@ describe("parseExcludeDomains", () => {
   it("returns empty array for whitespace only", () => {
     expect(parseExcludeDomains("   \n  ,  ")).toEqual([]);
   });
+
+  it("splits by semicolon", () => {
+    expect(parseExcludeDomains("a.com;b.com;c.com")).toEqual(["a.com", "b.com", "c.com"]);
+  });
+
+  it("splits by slash", () => {
+    expect(parseExcludeDomains("a.com/b.com/c.com")).toEqual(["a.com", "b.com", "c.com"]);
+  });
+
+  it("splits by mixed delimiters including semicolon and slash", () => {
+    expect(parseExcludeDomains("a.com;b.com/c.com d.com,e.com")).toEqual(["a.com", "b.com", "c.com", "d.com", "e.com"]);
+  });
 });

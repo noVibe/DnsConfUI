@@ -2,7 +2,7 @@ import { Octokit } from "@octokit/core";
 import type { DnsConfPayload } from "@/domain/dnsconf-config";
 import { encryptGitHubSecret } from "./crypto";
 
-type Request = (route: string, parameters?: Record<string, unknown>) => Promise<{ data?: unknown }>;
+type GitHubRequest = (route: string, parameters?: Record<string, unknown>) => Promise<{ data?: unknown }>;
 
 type EncryptSecret = (value: string, publicKey: string) => Promise<string>;
 
@@ -13,7 +13,7 @@ export type ProvisionDnsConfInput = {
   sourceRepo: string;
   workflowFileName: string;
   payload: DnsConfPayload;
-  request: Request;
+  request: GitHubRequest;
   encryptSecret?: EncryptSecret;
   onStep?: (step: ProvisionStep) => Promise<void> | void;
   profileCount?: number;
@@ -42,9 +42,9 @@ type PublicKeyResponse = {
 const POLL_RETRIES = 12;
 const POLL_INTERVAL_MS = 5000;
 
-export function createGitHubRequest(token: string): Request {
+export function createGitHubRequest(token: string): GitHubRequest {
   const octokit = new Octokit({ auth: token });
-  const request = octokit.request as unknown as Request;
+  const request = octokit.request as unknown as GitHubRequest;
   return (route, parameters) => request(route, parameters);
 }
 
@@ -115,14 +115,14 @@ export async function provisionDnsConfRepository({
   return { repository: { owner, repo }, workflowRunUrl, workflowRunId };
 }
 
-async function getAuthenticatedUser(request: Request): Promise<string> {
+async function getAuthenticatedUser(request: GitHubRequest): Promise<string> {
   const response = await request("GET /user");
   const data = response.data as { login: string };
   return data.login;
 }
 
 async function findExistingFork(
-  request: Request,
+  request: GitHubRequest,
   user: string,
   repo: string
 ): Promise<{ owner: string; repo: string } | null> {
@@ -138,7 +138,7 @@ async function findExistingFork(
 }
 
 async function ensureFork(
-  request: Request,
+  request: GitHubRequest,
   sourceOwner: string,
   sourceRepo: string,
   user: string
@@ -167,7 +167,7 @@ async function ensureFork(
 }
 
 async function waitForFork(
-  request: Request,
+  request: GitHubRequest,
   user: string,
   repo: string
 ): Promise<{ owner: string; repo: string }> {
@@ -190,7 +190,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function upsertVariable(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string,
   name: string,
@@ -221,7 +221,7 @@ const DISPATCH_POLL_RETRIES = 10;
 const DISPATCH_POLL_INTERVAL_MS = 2000;
 
 async function fetchWorkflowRun(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string,
   workflowFileName: string
@@ -248,7 +248,7 @@ async function fetchWorkflowRun(
 const WORKFLOW_COMPLETION_INTERVAL_MS = 10000;
 
 async function waitForWorkflowRunCompletion(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string,
   runId: number,
@@ -278,7 +278,7 @@ async function waitForWorkflowRunCompletion(
   // Timeout — still mark as done (the workflow might still be running)
 }
 
-async function enableActionsIfDisabled(request: Request, owner: string, repo: string): Promise<void> {
+async function enableActionsIfDisabled(request: GitHubRequest, owner: string, repo: string): Promise<void> {
   try {
     await request("PUT /repos/{owner}/{repo}/actions/permissions", {
       owner,
@@ -292,7 +292,7 @@ async function enableActionsIfDisabled(request: Request, owner: string, repo: st
 }
 
 export async function isForkBehind(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string,
   upstreamOwner: string,
@@ -312,7 +312,7 @@ export async function isForkBehind(
 }
 
 export async function syncFork(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string
 ): Promise<void> {
@@ -324,7 +324,7 @@ export async function syncFork(
 }
 
 export async function starRepository(
-  request: Request,
+  request: GitHubRequest,
   owner: string,
   repo: string
 ): Promise<void> {

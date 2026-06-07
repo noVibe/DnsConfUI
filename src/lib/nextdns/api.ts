@@ -1,28 +1,10 @@
-export type NextDNSConfigResult =
+type NextDNSConfigResult =
   | { success: true }
   | { success: false; error: string; status?: number };
 
-export type NextDNSValidationResult =
+type NextDNSValidationResult =
   | { valid: true }
   | { valid: false; error: string };
-
-export async function validateNextDNSCredentials(
-  clientId: string,
-  authSecret: string
-): Promise<NextDNSValidationResult> {
-  try {
-    const res = await fetch("/api/nextdns/validate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, authSecret })
-    });
-
-    const data = await res.json();
-    return data;
-  } catch {
-    return { valid: false, error: "Failed to reach validation endpoint." };
-  }
-}
 
 export async function validateCredentials(
   clientId: string,

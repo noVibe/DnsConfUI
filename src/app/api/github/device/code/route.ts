@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
-  if (!clientId) {
+  if (!gitHubClientId) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
   }
 
@@ -14,7 +14,7 @@ export async function POST() {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      client_id: clientId,
+      client_id: gitHubClientId,
       scope: "repo workflow read:user"
     })
   });
