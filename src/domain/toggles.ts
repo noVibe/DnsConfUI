@@ -1,11 +1,14 @@
-export const GEOBLOCK_HOSTS_URL =
+export const GEOHIDE_HOSTS_LIST =
   "https://raw.githubusercontent.com/Internet-Helper/GeoHideDNS/refs/heads/main/hosts/hosts";
 
-export const ADBLOCK_HOSTS_URL =
+export const MALW_HOSTS_LIST =
   "https://raw.githubusercontent.com/ImMALWARE/dns.malw.link/refs/heads/master/hosts";
 
-export const OISD_SMALL_URL =
-  "https://raw.githubusercontent.com/cbuijs/oisd/refs/heads/master/small/domains.original";
+export const OISD_SMALL_BLOCK_SUBDOMAINS =
+  "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_small.txt";
+
+export const OISD_SMALL_BLOCK_DOMAINS =
+  "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild_small.txt";
 
 export const ADS_BLOCKLIST_IDS = [
   "nextdns-recommended",
