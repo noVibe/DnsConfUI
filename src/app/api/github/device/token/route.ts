@@ -6,9 +6,9 @@ const tokenRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
-  if (!clientId) {
+  if (!gitHubClientId) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
   }
 
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      client_id: clientId,
+      client_id: gitHubClientId,
       device_code: parsed.data.device_code,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code"
     })
