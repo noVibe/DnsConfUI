@@ -1,5 +1,8 @@
-export const GEOBLOCK_HOSTS_URL =
+export const GEOHIDE_HOSTS_LIST =
   "https://raw.githubusercontent.com/Internet-Helper/GeoHideDNS/refs/heads/main/hosts/hosts";
+
+export const MALW_HOSTS_LIST =
+  "https://raw.githubusercontent.com/ImMALWARE/dns.malw.link/refs/heads/master/hosts";
 
 export const OISD_SMALL_BLOCK_SUBDOMAINS =
   "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_small.txt";

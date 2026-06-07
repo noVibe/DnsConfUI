@@ -12,7 +12,7 @@ import {
   type Profile
 } from "@/domain/dnsconf-config";
 import type { LocaleKey } from "@/lib/i18n/en";
-import { GEOBLOCK_HOSTS_URL, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
+import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
@@ -175,11 +175,12 @@ export function SetupWizard() {
       const blockUrls: string[] = [];
       const redirectUrls: string[] = [];
       if (geoBlock && geoHideChecked) {
-        if (provider === "cloudflare") blockUrls.push(GEOBLOCK_HOSTS_URL);
-        redirectUrls.push(GEOBLOCK_HOSTS_URL);
+        redirectUrls.push(GEOHIDE_HOSTS_LIST);
+      }
+      if (geoBlock && malwChecked) {
+        redirectUrls.push(MALW_HOSTS_LIST);
       }
       if (blockAds && provider === "cloudflare") {
-        if (!blockUrls.includes(GEOBLOCK_HOSTS_URL)) blockUrls.push(GEOBLOCK_HOSTS_URL);
         [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS].forEach(url => { if (!blockUrls.includes(url)) blockUrls.push(url); });
       }
 
