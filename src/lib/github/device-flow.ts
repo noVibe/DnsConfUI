@@ -6,7 +6,7 @@ export type DeviceCodeResponse = {
   interval: number;
 };
 
-export type DeviceTokenResponse = {
+type DeviceTokenResponse = {
   access_token: string;
   token_type: string;
   scope: string;

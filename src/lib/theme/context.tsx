@@ -28,10 +28,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    setTheme(readInitialTheme());
-  }, []);
-
-  useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem(STORAGE_KEY)) {

@@ -1,10 +1,5 @@
 import sodium from "libsodium-wrappers";
 
-export type GitHubPublicKey = {
-  key: string;
-  key_id: string;
-};
-
 export async function encryptGitHubSecret(value: string, publicKey: string): Promise<string> {
   await sodium.ready;
 

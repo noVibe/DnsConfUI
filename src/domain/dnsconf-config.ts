@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
 
-export const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
+const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
 
-export const profileSchema = z.object({
+const profileSchema = z.object({
   clientId: z.string().trim().min(1, "validation.clientIdRequired"),
   authSecret: z.string().trim().min(1, "validation.authSecretRequired"),
   provider: dnsProviderSchema.or(z.literal(""))
@@ -19,7 +20,7 @@ export const dnsConfConfigSchema = z
     for (const [index, profile] of data.profiles.entries()) {
       const len = profile.clientId.length;
       if (len === 0) continue;
-      const expected = profile.provider === "nextdns" ? 6 : 32;
+      const expected = profile.provider === "nextdns" ? NEXTDNS_CLIENT_ID_LENGTH : CLOUDFLARE_CLIENT_ID_LENGTH;
       if (len !== expected) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
