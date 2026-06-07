@@ -1,10 +1,4 @@
-export const GEOBLOCK_HOSTS_URL =
-  "https://raw.githubusercontent.com/Internet-Helper/GeoHideDNS/refs/heads/main/hosts/hosts";
-
-export const ADBLOCK_HOSTS_URL =
-  "https://raw.githubusercontent.com/ImMALWARE/dns.malw.link/refs/heads/master/hosts";
-
-export const OISD_SMALL_URLS = [
+export const GEOBLOCK_HOSTS_URL = [
   "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_small.txt",
   "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild_small.txt"
 ];
