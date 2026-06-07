@@ -5,7 +5,7 @@ export const ADBLOCK_HOSTS_URL =
   "https://raw.githubusercontent.com/ImMALWARE/dns.malw.link/refs/heads/master/hosts";
 
 export const OISD_SMALL_URL =
-  "https://small.oisd.nl/domainswild2";
+  "https://raw.githubusercontent.com/cbuijs/oisd/refs/heads/master/small/domains.original";
 
 export const ADS_BLOCKLIST_IDS = [
   "nextdns-recommended",
