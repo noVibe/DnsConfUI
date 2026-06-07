@@ -4,8 +4,10 @@ export const GEOBLOCK_HOSTS_URL =
 export const ADBLOCK_HOSTS_URL =
   "https://raw.githubusercontent.com/ImMALWARE/dns.malw.link/refs/heads/master/hosts";
 
-export const OISD_SMALL_URL =
-  "https://raw.githubusercontent.com/cbuijs/oisd/refs/heads/master/small/domains.original";
+export const OISD_SMALL_URLS = [
+  "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild2_small.txt",
+  "https://raw.githubusercontent.com/sjhgvr/oisd/refs/heads/main/domainswild_small.txt"
+];
 
 export const ADS_BLOCKLIST_IDS = [
   "nextdns-recommended",
