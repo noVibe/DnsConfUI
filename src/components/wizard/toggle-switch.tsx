@@ -9,7 +9,8 @@ export function ToggleSwitch({
   label,
   tooltip,
   children,
-  disabled = false
+  disabled = false,
+  labelNowrap = false
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -17,6 +18,7 @@ export function ToggleSwitch({
   tooltip?: string;
   children?: React.ReactNode;
   disabled?: boolean;
+  labelNowrap?: boolean;
 }) {
   const inputId = useId();
 
@@ -35,12 +37,12 @@ export function ToggleSwitch({
         <div className="h-5 w-9 rounded-full bg-line transition peer-checked:bg-moss" />
         <div className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition peer-checked:translate-x-4" />
       </label>
-      <div className="flex flex-1 items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5">
-          <label htmlFor={inputId} className={`${disabled ? "cursor-not-allowed" : "cursor-pointer"} text-sm font-medium text-ink`}>{label}</label>
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-4">
+        <div className={`flex items-center gap-1.5 ${labelNowrap ? "shrink-0" : "min-w-0"}`}>
+          <label htmlFor={inputId} className={`${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${labelNowrap ? "whitespace-nowrap" : ""} text-sm font-medium text-ink`}>{label}</label>
           {tooltip ? <Tooltip text={tooltip} /> : null}
         </div>
-        {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
+        {children ? <div className="flex min-w-0 shrink items-center gap-2">{children}</div> : null}
       </div>
     </div>
   );

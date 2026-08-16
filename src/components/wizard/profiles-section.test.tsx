@@ -59,6 +59,7 @@ describe("ProfilesSection", () => {
     renderSection();
 
     expect(screen.getByRole("checkbox", { name: "DNS-донор" })).toBeChecked();
+    expect(screen.getByText("DNS-донор", { selector: "label" })).toHaveClass("whitespace-nowrap");
     expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue(DEFAULT_DNS_DONOR);
   });
 

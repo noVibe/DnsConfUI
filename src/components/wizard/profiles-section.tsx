@@ -226,10 +226,11 @@ export function ProfilesSection({
               onChange={(checked) => update(selected, "donorDns", checked ? DEFAULT_DNS_DONOR : "")}
               label={t('profiles.donor')}
               tooltip={t('profiles.donorTooltip')}
+              labelNowrap
             >
               {profiles[selected].donorDns ? (
                 <select
-                  className="h-5 rounded-md border border-line bg-white px-2 text-xs text-ink outline-none focus:border-steel focus:ring-2 focus:ring-steel/20"
+                  className="h-5 w-56 min-w-0 max-w-full rounded-md border border-line bg-white px-2 text-xs text-ink outline-none focus:border-steel focus:ring-2 focus:ring-steel/20"
                   value={profiles[selected].donorDns}
                   onChange={(e) => update(selected, "donorDns", e.target.value)}
                   aria-label={t('profiles.donor')}

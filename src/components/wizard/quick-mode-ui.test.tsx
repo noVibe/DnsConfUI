@@ -41,11 +41,19 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
     ...overrides,
   };
 
-  render(<LocaleProvider><QuickModeUI {...props} /></LocaleProvider>);
-  return callbacks;
+  const view = render(<LocaleProvider><QuickModeUI {...props} /></LocaleProvider>);
+  return { ...callbacks, container: view.container };
 }
 
 describe("QuickModeUI", () => {
+  it("uses zero-minimum grid tracks so long controls cannot squeeze the provision panel", () => {
+    const { container } = renderQuickMode();
+
+    expect(container.firstElementChild).toHaveClass(
+      "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
+    );
+  });
+
   it("keeps GeoHide and Malw visible when geo-blocking is disabled", () => {
     renderQuickMode();
 

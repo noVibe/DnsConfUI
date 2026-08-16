@@ -87,8 +87,8 @@ export function QuickModeUI({
   const noToggles = !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-      <div className="space-y-5">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <div className="min-w-0 space-y-5">
         {!retainCredentials ? <CredsGuide /> : null}
          <ProfilesSection
             profiles={profiles}
@@ -209,7 +209,7 @@ export function QuickModeUI({
         ) : null}
       </div>
 
-      <aside className="space-y-5">
+      <aside className="min-w-0 space-y-5">
         {status !== "idle" ? (
           <section className="rounded-lg border border-line bg-paper p-4">
             <h3 className="text-sm font-semibold text-ink">{t('quick.progress')}</h3>
