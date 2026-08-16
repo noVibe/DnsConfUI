@@ -91,7 +91,7 @@ export const locale = {
   "profiles.donorPlaceholder": "IPv4 address or DoH URL",
   "profiles.donorCustom": "Custom",
   "profiles.donorInvalid": "Enter a valid IPv4 address or DoH URL",
-  "profiles.credentialsRetained": "CLIENT_ID and AUTH_SECRET remain stored in GitHub Secrets.",
+  "profiles.credentialsRetained": "CLIENT_ID and AUTH_SECRET remain unchanged.",
 
   "script.title": "Script behaviour",
   "script.oldSettings": "Existing BLOCK/REDIRECT settings will be updated from the provided sources.",

@@ -148,7 +148,7 @@ describe("ProfilesSection", () => {
     expect(screen.queryByRole("button", { name: "Удалить профиль" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: /CLIENT_ID/ })).not.toBeInTheDocument();
     expect(screen.getByText("DNS: NextDNS")).toBeVisible();
-    expect(screen.getByText("CLIENT_ID и AUTH_SECRET остаются в GitHub Secrets.")).toBeVisible();
+    expect(screen.getByText("CLIENT_ID и AUTH_SECRET — без изменений.")).toBeVisible();
 
     fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "1" } });
     expect(screen.getByText("DNS: Cloudflare")).toBeVisible();

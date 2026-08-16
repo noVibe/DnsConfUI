@@ -93,7 +93,7 @@ export const locale: Record<LocaleKey, string> = {
   "profiles.donorPlaceholder": "IPv4-адрес или DoH URL",
   "profiles.donorCustom": "Свой адрес",
   "profiles.donorInvalid": "Введите корректный IPv4-адрес или DoH URL",
-  "profiles.credentialsRetained": "CLIENT_ID и AUTH_SECRET остаются в GitHub Secrets.",
+  "profiles.credentialsRetained": "CLIENT_ID и AUTH_SECRET — без изменений.",
 
   "script.title": "Поведение скрипта",
   "script.oldSettings": "Текущие настройки BLOCK/REDIRECT будут обновлены из указанных источников.",
