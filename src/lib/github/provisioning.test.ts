@@ -6,6 +6,9 @@ describe("provisionDnsConfRepository", () => {
   it("forks DnsConf, uploads encrypted secrets, upserts variables, and dispatches the workflow", async () => {
     let forkExists = false;
     const request = vi.fn(async (route: string) => {
+      if (route === "GET /repos/{owner}/{repo}/environments/{environment_name}") {
+        throw Object.assign(new Error("Environment not found"), { status: 404 });
+      }
       if (route === "GET /user") {
         return { data: { login: "alice" } };
       }
@@ -69,12 +72,20 @@ describe("provisionDnsConfRepository", () => {
       })
     );
     expect(request).toHaveBeenCalledWith(
-      "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ name: "DNS", value: "cloudflare" })
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ environment_name: "DNS", name: "DNS", value: "cloudflare" })
     );
     expect(request).toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ environment_name: "DNS", name: "DONOR_DNS", value: "https://dns.geohide.ru:444/dns-query" })
+    );
+    expect(request).toHaveBeenCalledWith(
+      "PUT /repos/{owner}/{repo}/environments/{environment_name}",
+      { owner: "alice", repo: "DnsConf", environment_name: "DNS" }
+    );
+    expect(request).not.toHaveBeenCalledWith(
       "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ name: "DONOR_DNS", value: "https://dns.geohide.ru:444/dns-query" })
+      expect.anything()
     );
     expect(request).toHaveBeenCalledWith(
       "POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
@@ -167,8 +178,8 @@ describe("provisionDnsConfRepository", () => {
     expect(request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/forks", expect.anything());
     expect(request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/merge-upstream", expect.anything());
     expect(request).toHaveBeenCalledWith(
-      "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ owner: "noVibe", repo: "DnsConf", name: "DNS" })
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ owner: "noVibe", repo: "DnsConf", environment_name: "DNS", name: "DNS" })
     );
   });
 
@@ -230,7 +241,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { status: "completed", conclusion: "success" } };
       }
       if (
-        route === "POST /repos/{owner}/{repo}/actions/variables" &&
+        route === "POST /repos/{owner}/{repo}/environments/{environment_name}/variables" &&
         parameters?.name === "DNS"
       ) {
         throw Object.assign(new Error("Variable already exists"), { status: 409 });
@@ -251,10 +262,11 @@ describe("provisionDnsConfRepository", () => {
     });
 
     expect(request).toHaveBeenCalledWith(
-      "PATCH /repos/{owner}/{repo}/actions/variables/{name}",
+      "PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
       {
         owner: "alice",
         repo: "DnsConf",
+        environment_name: "DNS",
         name: "DNS",
         value: "cloudflare"
       }
@@ -287,7 +299,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { status: "completed", conclusion: "success" } };
       }
       if (
-        route === "POST /repos/{owner}/{repo}/actions/variables" &&
+        route === "POST /repos/{owner}/{repo}/environments/{environment_name}/variables" &&
         parameters?.name === "BLOCK"
       ) {
         throw Object.assign(new Error("Variable already exists"), { response: { status: 422 } });
@@ -308,10 +320,11 @@ describe("provisionDnsConfRepository", () => {
     });
 
     expect(request).toHaveBeenCalledWith(
-      "PATCH /repos/{owner}/{repo}/actions/variables/{name}",
+      "PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
       {
         owner: "alice",
         repo: "DnsConf",
+        environment_name: "DNS",
         name: "BLOCK",
         value: "https://example.com/list"
       }
@@ -382,8 +395,8 @@ describe("provisionDnsConfRepository", () => {
 
     expect(steps).toEqual(["fork", "secrets", "dispatch"]);
     expect(request).toHaveBeenCalledWith(
-      "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ name: "BLOCK", value: "" }),
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ environment_name: "DNS", name: "BLOCK", value: "" }),
     );
   });
 
@@ -394,7 +407,7 @@ describe("provisionDnsConfRepository", () => {
       if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
-      if (route === "POST /repos/{owner}/{repo}/actions/variables") {
+      if (route === "POST /repos/{owner}/{repo}/environments/{environment_name}/variables") {
         throw Object.assign(new Error("server error"), { status: 500 });
       }
       return { data: {} };
@@ -485,6 +498,7 @@ describe("loadExistingDnsConfSetup", () => {
     const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf");
 
     expect(result?.repository).toEqual({ owner: "alice", repo: "DnsConf" });
+    expect(result?.variableEnvironment).toBe("DNS");
     expect(result?.variables).toEqual({
       DNS: "nextdns,cloudflare",
       DONOR_DNS: "-,https://dns.comss.one/dns-query"

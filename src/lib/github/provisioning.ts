@@ -80,11 +80,13 @@ export async function provisionDnsConfRepository({
   onStep,
   profileCount = 1,
   retainCredentials = false,
-  variableEnvironment
+  variableEnvironment = DNSCONF_ENVIRONMENT_NAME
 }: ProvisionDnsConfInput): Promise<ProvisionResult> {
   const user = await getAuthenticatedUser(request);
   const { owner, repo } = await ensureFork(request, sourceOwner, sourceRepo, user);
   await onStep?.("fork");
+
+  await ensureVariableEnvironment(request, owner, repo, variableEnvironment);
 
   if (!retainCredentials) {
     const publicKey = await request("GET /repos/{owner}/{repo}/actions/secrets/public-key", {
@@ -189,7 +191,7 @@ async function loadDnsConfEnvironmentVariables(
   owner: string,
   repo: string,
   variables: DnsConfVariables
-): Promise<string | undefined> {
+): Promise<string> {
   const response = await request("GET /repos/{owner}/{repo}/environments", {
     owner,
     repo,
@@ -199,7 +201,7 @@ async function loadDnsConfEnvironmentVariables(
   const environment = data.environments?.find(
     ({ name }) => name?.toLowerCase() === DNSCONF_ENVIRONMENT_NAME.toLowerCase()
   );
-  if (!environment?.name) return undefined;
+  if (!environment?.name) return DNSCONF_ENVIRONMENT_NAME;
 
   const variableResponse = await request(
     "GET /repos/{owner}/{repo}/environments/{environment_name}/variables",
@@ -208,6 +210,21 @@ async function loadDnsConfEnvironmentVariables(
   const variableData = variableResponse.data as { variables?: Array<{ name?: string; value?: string }> };
   applyDnsConfVariables(variables, variableData.variables);
   return environment.name;
+}
+
+async function ensureVariableEnvironment(
+  request: GitHubRequest,
+  owner: string,
+  repo: string,
+  environment: string
+) {
+  const parameters = { owner, repo, environment_name: environment };
+  try {
+    await request("GET /repos/{owner}/{repo}/environments/{environment_name}", parameters);
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
+    await request("PUT /repos/{owner}/{repo}/environments/{environment_name}", parameters);
+  }
 }
 
 async function getAuthenticatedUser(request: GitHubRequest): Promise<string> {
@@ -307,30 +324,24 @@ async function upsertVariable(
   repo: string,
   name: string,
   value: string,
-  environment?: string
+  environment: string
 ) {
-  const createRoute = environment
-    ? "POST /repos/{owner}/{repo}/environments/{environment_name}/variables"
-    : "POST /repos/{owner}/{repo}/actions/variables";
-  const updateRoute = environment
-    ? "PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}"
-    : "PATCH /repos/{owner}/{repo}/actions/variables/{name}";
   const parameters = {
     owner,
     repo,
-    ...(environment ? { environment_name: environment } : {}),
+    environment_name: environment,
     name,
     value
   };
 
   try {
-    await request(createRoute, parameters);
+    await request("POST /repos/{owner}/{repo}/environments/{environment_name}/variables", parameters);
   } catch (error) {
     if (!isAlreadyExistsError(error)) {
       throw error;
     }
 
-    await request(updateRoute, parameters);
+    await request("PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}", parameters);
   }
 }
 
