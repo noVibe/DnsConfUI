@@ -145,6 +145,11 @@ async function ensureFork(
 ): Promise<{ owner: string; repo: string }> {
   const existing = await findExistingFork(request, user, sourceRepo);
   if (existing) {
+    await request("POST /repos/{owner}/{repo}/merge-upstream", {
+      owner: existing.owner,
+      repo: existing.repo,
+      branch: "main"
+    });
     return existing;
   }
 
@@ -289,38 +294,6 @@ async function enableActionsIfDisabled(request: GitHubRequest, owner: string, re
   } catch {
     // non-critical
   }
-}
-
-export async function isForkBehind(
-  request: GitHubRequest,
-  owner: string,
-  repo: string,
-  upstreamOwner: string,
-  upstreamRepo: string
-): Promise<boolean> {
-  try {
-    const response = await request("GET /repos/{owner}/{repo}/compare/{basehead}", {
-      owner,
-      repo,
-      basehead: `main...${upstreamOwner}:${upstreamRepo}:main`
-    });
-    const data = response.data as { behind_by?: number };
-    return (data.behind_by ?? 0) > 0;
-  } catch {
-    return false;
-  }
-}
-
-export async function syncFork(
-  request: GitHubRequest,
-  owner: string,
-  repo: string
-): Promise<void> {
-  await request("POST /repos/{owner}/{repo}/merge-upstream", {
-    owner,
-    repo,
-    branch: "main"
-  });
 }
 
 export async function starRepository(

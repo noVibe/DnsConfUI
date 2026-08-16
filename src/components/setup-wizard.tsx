@@ -11,7 +11,7 @@ import {
 } from "@/domain/dnsconf-config";
 import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
-import { createGitHubRequest, isForkBehind, provisionDnsConfRepository, starRepository, syncFork, type ProvisionResult } from "@/lib/github/provisioning";
+import { createGitHubRequest, provisionDnsConfRepository, starRepository, type ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { useAuth } from "./auth-provider";
 import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
@@ -32,10 +32,6 @@ export function SetupWizard() {
   const [result, setResult] = useState<ProvisionResult | null>(null);
   const [starred, setStarred] = useState(false);
   const [starring, setStarring] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [synced, setSynced] = useState(false);
-  const [needsSync, setNeedsSync] = useState<boolean | null>(null);
-  const [userLogin, setUserLogin] = useState<string | null>(null);
   const [mode, setMode] = useState<"quick" | "expert">("quick");
   const [geoBlock, setGeoBlock] = useState(true);
   const [geoHideChecked, setGeoHideChecked] = useState(true);
@@ -258,16 +254,6 @@ export function SetupWizard() {
     }
   }, [clientIdsJson, form.setValue]);
 
-  useEffect(() => {
-    if (!token || synced) return;
-    const req = createGitHubRequest(token);
-    req("GET /user").then((r: unknown) => {
-      const login = (r as { data: { login: string } }).data.login;
-      setUserLogin(login);
-      return isForkBehind(req, login, dnsConfWorkflow.sourceRepo, dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo);
-    }).then(setNeedsSync).catch(() => setNeedsSync(false));
-  }, [token, synced]);
-
   async function provision() {
     const parsedConfig = dnsConfConfigSchema.safeParse(normalizeValues(values));
 
@@ -308,20 +294,6 @@ export function SetupWizard() {
       setStarred(false);
     } finally {
       setStarring(false);
-    }
-  }
-
-  async function handleSync() {
-    if (!token || !userLogin) return;
-    setSyncing(true);
-    try {
-      await syncFork(createGitHubRequest(token), userLogin, dnsConfWorkflow.sourceRepo);
-      setSynced(true);
-      setNeedsSync(false);
-    } catch {
-      setSynced(false);
-    } finally {
-      setSyncing(false);
     }
   }
 
@@ -372,10 +344,6 @@ export function SetupWizard() {
               starred={starred}
               starring={starring}
               onStar={handleStar}
-              syncing={syncing}
-              synced={synced}
-              needsSync={needsSync}
-              onSync={handleSync}
             />
           </aside>
         </div>
@@ -414,10 +382,6 @@ export function SetupWizard() {
             starred={starred}
             starring={starring}
             onStar={handleStar}
-            syncing={syncing}
-            synced={synced}
-            needsSync={needsSync}
-            onSync={handleSync}
           />
         </div>
       )}

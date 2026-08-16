@@ -42,11 +42,7 @@ export function QuickModeUI({
   result,
   starred,
   starring,
-  onStar,
-  syncing,
-  synced,
-  needsSync,
-  onSync
+  onStar
 }: {
   mode: "quick" | "expert";
   setMode: (m: "quick" | "expert") => void;
@@ -80,10 +76,6 @@ export function QuickModeUI({
   starred: boolean;
   starring: boolean;
   onStar: () => Promise<void>;
-  syncing: boolean;
-  synced: boolean;
-  needsSync: boolean | null;
-  onSync: () => Promise<void>;
 }) {
   const { t } = useLocale();
   const isNextDNS = providerValue === "nextdns";
@@ -211,10 +203,6 @@ export function QuickModeUI({
           starred={starred}
           starring={starring}
           onStar={onStar}
-          syncing={syncing}
-          synced={synced}
-          needsSync={needsSync}
-          onSync={onSync}
         />
       </aside>
     </div>

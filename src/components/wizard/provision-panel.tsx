@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, GitBranch, Loader2, Play, Star, X } from "lucide-react";
+import { CheckCircle2, Loader2, Play, Star } from "lucide-react";
 import type { ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { Button } from "@/components/ui";
@@ -45,11 +45,7 @@ export function ProvisionPanel({
   disabled,
   starred,
   starring,
-  onStar,
-  syncing,
-  synced,
-  needsSync,
-  onSync
+  onStar
 }: {
   status: Status;
   message: string;
@@ -59,10 +55,6 @@ export function ProvisionPanel({
   starred: boolean;
   starring: boolean;
   onStar: () => Promise<void>;
-  syncing: boolean;
-  synced: boolean;
-  needsSync: boolean | null;
-  onSync: () => Promise<void>;
 }) {
   const { t } = useLocale();
   return (
@@ -70,18 +62,6 @@ export function ProvisionPanel({
       <p className="mt-2 text-sm leading-6 text-ink/72">
         {t('provision.desc')}
       </p>
-      {needsSync && status === "idle" ? (
-        <StateButton
-          label={t('provision.sync')}
-          icon={<GitBranch className="size-4" aria-hidden="true" />}
-          onClick={onSync}
-          disabled={synced || syncing}
-          state={syncing ? "loading" : synced ? "done" : "idle"}
-          activeLabel={t('provision.syncing')}
-          doneLabel={t('provision.synced')}
-        />
-      ) : null}
-
       <Button className="mt-4 w-full" onClick={onProvision} disabled={disabled}>
         {status === "running" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -117,17 +97,6 @@ export function ProvisionPanel({
             activeLabel={t('provision.starring')}
             doneLabel={t('provision.starred')}
           />
-          {(needsSync || syncing || synced) ? (
-            <StateButton
-              label={t('provision.sync')}
-              icon={<GitBranch className="size-4" aria-hidden="true" />}
-              onClick={onSync}
-              disabled={synced || syncing}
-              state={syncing ? "loading" : synced ? "done" : "idle"}
-              activeLabel={t('provision.syncing')}
-              doneLabel={t('provision.synced')}
-            />
-          ) : null}
         </div>
       ) : null}
 

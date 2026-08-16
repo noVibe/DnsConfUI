@@ -39,10 +39,6 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
     starred: false,
     starring: false,
     onStar: vi.fn().mockResolvedValue(undefined),
-    syncing: false,
-    synced: false,
-    needsSync: false,
-    onSync: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 

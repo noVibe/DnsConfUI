@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { isForkBehind, provisionDnsConfRepository, starRepository, syncFork } from "./provisioning";
+import { provisionDnsConfRepository, starRepository } from "./provisioning";
 
 describe("provisionDnsConfRepository", () => {
   it("forks DnsConf, uploads encrypted secrets, upserts variables, and dispatches the workflow", async () => {
@@ -53,6 +53,10 @@ describe("provisionDnsConfRepository", () => {
       owner: "noVibe",
       repo: "DnsConf"
     });
+    expect(request).not.toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/merge-upstream",
+      expect.anything()
+    );
     expect(request).toHaveBeenCalledWith(
       "PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}",
       expect.objectContaining({
@@ -116,6 +120,48 @@ describe("provisionDnsConfRepository", () => {
 
     expect(result.repository).toEqual({ owner: "alice", repo: "DnsConf" });
     expect(request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/forks", expect.anything());
+    expect(request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/merge-upstream", {
+      owner: "alice",
+      repo: "DnsConf",
+      branch: "main"
+    });
+
+    const syncCallIndex = request.mock.calls.findIndex(([route]) => route === "POST /repos/{owner}/{repo}/merge-upstream");
+    const secretsCallIndex = request.mock.calls.findIndex(([route]) => route === "GET /repos/{owner}/{repo}/actions/secrets/public-key");
+    expect(syncCallIndex).toBeGreaterThan(-1);
+    expect(syncCallIndex).toBeLessThan(secretsCallIndex);
+  });
+
+  it("fails before configuration when an existing fork cannot be synchronized", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") {
+        return { data: { login: "alice" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+      }
+      if (route === "POST /repos/{owner}/{repo}/merge-upstream") {
+        throw new Error("Fork has conflicts");
+      }
+      return { data: {} };
+    });
+
+    await expect(provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`
+    })).rejects.toThrow("Fork has conflicts");
+
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/secrets/public-key",
+      expect.anything()
+    );
   });
 
   it("updates existing GitHub Actions variables instead of failing on conflict", async () => {
@@ -328,36 +374,7 @@ describe("provisionDnsConfRepository", () => {
   });
 });
 
-describe("fork maintenance helpers", () => {
-  it("detects when a fork is behind upstream", async () => {
-    const request = vi.fn(async () => ({ data: { behind_by: 3 } }));
-
-    await expect(isForkBehind(request, "alice", "DnsConf", "noVibe", "DnsConf")).resolves.toBe(true);
-    expect(request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/compare/{basehead}", {
-      owner: "alice",
-      repo: "DnsConf",
-      basehead: "main...noVibe:DnsConf:main",
-    });
-  });
-
-  it("returns false when comparison fails", async () => {
-    const request = vi.fn(async () => { throw new Error("network"); });
-
-    await expect(isForkBehind(request, "alice", "DnsConf", "noVibe", "DnsConf")).resolves.toBe(false);
-  });
-
-  it("syncs a fork from its main branch", async () => {
-    const request = vi.fn(async () => ({ data: {} }));
-
-    await syncFork(request, "alice", "DnsConf");
-
-    expect(request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/merge-upstream", {
-      owner: "alice",
-      repo: "DnsConf",
-      branch: "main",
-    });
-  });
-
+describe("repository helpers", () => {
   it("stars a repository", async () => {
     const request = vi.fn(async () => ({ data: {} }));
 
