@@ -8,24 +8,27 @@ export function ToggleSwitch({
   onChange,
   label,
   tooltip,
-  children
+  children,
+  disabled = false
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
   tooltip?: string;
   children?: React.ReactNode;
+  disabled?: boolean;
 }) {
   const inputId = useId();
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-line bg-white p-4 transition hover:border-steel">
-      <label htmlFor={inputId} className="relative mt-0.5 shrink-0 cursor-pointer">
+    <div className={`flex items-start gap-3 rounded-lg border border-line bg-white p-4 transition ${disabled ? "opacity-55" : "hover:border-steel"}`}>
+      <label htmlFor={inputId} className={`relative mt-0.5 shrink-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
         <input
           id={inputId}
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
+          disabled={disabled}
           aria-label={label}
           className="peer sr-only"
         />
@@ -34,7 +37,7 @@ export function ToggleSwitch({
       </label>
       <div className="flex flex-1 items-center justify-between gap-4">
         <div className="flex items-center gap-1.5">
-          <label htmlFor={inputId} className="cursor-pointer text-sm font-medium text-ink">{label}</label>
+          <label htmlFor={inputId} className={`${disabled ? "cursor-not-allowed" : "cursor-pointer"} text-sm font-medium text-ink`}>{label}</label>
           {tooltip ? <Tooltip text={tooltip} /> : null}
         </div>
         {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}

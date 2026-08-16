@@ -22,7 +22,8 @@ export function ProfilesSection({
   profileDonorErrors,
   mixedProviderIndices,
   simplified,
-  onValidChange
+  onValidChange,
+  retainCredentials = false
 }: {
   profiles: DnsConfConfig["profiles"];
   setValue: UseFormSetValue<DnsConfConfig>;
@@ -32,6 +33,7 @@ export function ProfilesSection({
   mixedProviderIndices?: Set<number>;
   simplified?: boolean;
   onValidChange?: (v: boolean) => void;
+  retainCredentials?: boolean;
 }) {
   const { t } = useLocale();
   const [selected, setSelected] = useState(0);
@@ -127,42 +129,60 @@ export function ProfilesSection({
             className="rounded-md border border-line bg-white px-2 py-1 text-sm text-ink"
             value={selected}
             onChange={(e) => setSelected(Number(e.target.value))}
+            aria-label={t('profiles.select')}
           >
             {profiles.map((_, i) => (
               <option key={i} value={i}>Profile {i + 1}</option>
             ))}
           </select>
         </div>
-        <button
-          type="button"
-          onClick={add}
-          className="inline-flex items-center gap-0.5 text-xs text-steel transition hover:text-ink"
-        >
-          <Plus className="size-3.5" />
-          {t('profiles.add')}
-        </button>
+        {!retainCredentials ? (
+          <button
+            type="button"
+            onClick={add}
+            className="inline-flex items-center gap-0.5 text-xs text-steel transition hover:text-ink"
+          >
+            <Plus className="size-3.5" />
+            {t('profiles.add')}
+          </button>
+        ) : null}
       </div>
 
       {profiles[selected] ? (
         <div className="space-y-3 rounded-md border border-line bg-white p-3">
           <div className="flex items-start justify-between gap-2">
-            <div className="text-sm font-medium text-ink/60">Profile {selected + 1}</div>
-            <button
-              type="button"
-              onClick={() => remove(selected)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-ink/40 transition hover:border-coral hover:text-coral"
-              aria-label={t('profiles.remove')}
-            >
-              <X className="size-4" />
-            </button>
+            <div>
+              <div className="text-sm font-medium text-ink/60">Profile {selected + 1}</div>
+              {retainCredentials && profiles[selected].provider ? (
+                <div className="mt-1 text-sm font-medium text-moss">
+                  {t('profiles.dns', { provider: t(profiles[selected].provider === "cloudflare" ? 'profiles.providerCloudflare' : 'profiles.providerNextDNS') })}
+                </div>
+              ) : null}
+            </div>
+            {!retainCredentials ? (
+              <button
+                type="button"
+                onClick={() => remove(selected)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line text-ink/40 transition hover:border-coral hover:text-coral"
+                aria-label={t('profiles.remove')}
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
           </div>
-          <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={translatedError(profileClientIdErrors?.find(e => e.index === selected)?.message, t)}>
-            <input className={inputClass} autoComplete="off" value={profiles[selected].clientId} onChange={(e) => update(selected, "clientId", e.target.value)} />
-          </Field>
-          <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={translatedError(profileSecretErrors?.find(e => e.index === selected)?.message, t)}>
-            <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
-          </Field>
-          {simplified && credStatus[selected] ? (
+          {retainCredentials ? (
+            <p className="text-sm leading-6 text-ink/65">{t('profiles.credentialsRetained')}</p>
+          ) : (
+            <>
+              <Field label={<span>{t('profiles.clientId')} <span className="text-coral">*</span></span>} error={translatedError(profileClientIdErrors?.find(e => e.index === selected)?.message, t)}>
+                <input className={inputClass} autoComplete="off" value={profiles[selected].clientId} onChange={(e) => update(selected, "clientId", e.target.value)} />
+              </Field>
+              <Field label={<span>{t('profiles.authSecret')} <span className="text-coral">*</span></span>} error={translatedError(profileSecretErrors?.find(e => e.index === selected)?.message, t)}>
+                <input className={inputClass} type="password" autoComplete="off" value={profiles[selected].authSecret} onChange={(e) => update(selected, "authSecret", e.target.value)} />
+              </Field>
+            </>
+          )}
+          {!retainCredentials && simplified && credStatus[selected] ? (
             <div className="flex items-start gap-2 text-sm">
               {credStatus[selected].status === "validating" ? (
                 <Loader2 className="mt-0.5 size-4 animate-spin text-moss shrink-0" aria-hidden="true" />
@@ -181,7 +201,7 @@ export function ProfilesSection({
               </span>
             </div>
           ) : null}
-          {profiles[selected].provider ? (
+          {!retainCredentials && profiles[selected].provider ? (
             <div>
               {simplified ? (
                 <div className="text-sm font-medium text-moss">
@@ -195,7 +215,7 @@ export function ProfilesSection({
               )}
             </div>
           ) : null}
-          {simplified && mixedProviderIndices?.has(selected) ? (
+          {!retainCredentials && simplified && mixedProviderIndices?.has(selected) ? (
             <div className="mt-2 rounded-md border border-coral/30 bg-coral/10 px-3 py-2 text-sm text-coral">
               {t('wizard.mixedProvider')}
             </div>

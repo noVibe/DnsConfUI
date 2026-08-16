@@ -45,7 +45,8 @@ export function ProvisionPanel({
   disabled,
   starred,
   starring,
-  onStar
+  onStar,
+  retainCredentials = false
 }: {
   status: Status;
   message: string;
@@ -55,12 +56,13 @@ export function ProvisionPanel({
   starred: boolean;
   starring: boolean;
   onStar: () => Promise<void>;
+  retainCredentials?: boolean;
 }) {
   const { t } = useLocale();
   return (
     <section className="rounded-lg border border-line bg-paper p-4">
       <p className="mt-2 text-sm leading-6 text-ink/72">
-        {t('provision.desc')}
+        {t(retainCredentials ? 'provision.retainDesc' : 'provision.desc')}
       </p>
       <Button className="mt-4 w-full" onClick={onProvision} disabled={disabled}>
         {status === "running" ? (

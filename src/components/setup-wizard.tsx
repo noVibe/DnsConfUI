@@ -7,11 +7,19 @@ import {
   defaultDnsConfConfig,
   dnsConfConfigSchema,
   dnsConfWorkflow,
+  retainedCredentialsConfigSchema,
   type DnsConfConfig
 } from "@/domain/dnsconf-config";
 import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
-import { createGitHubRequest, provisionDnsConfRepository, starRepository, type ProvisionResult } from "@/lib/github/provisioning";
+import {
+  createGitHubRequest,
+  loadExistingDnsConfSetup,
+  provisionDnsConfRepository,
+  starRepository,
+  type ExistingDnsConfSetup,
+  type ProvisionResult
+} from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { useAuth } from "./auth-provider";
 import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
@@ -22,6 +30,7 @@ import { ProfilesSection } from "./wizard/profiles-section";
 import { ReviewPanel } from "./wizard/review-panel";
 import { ProvisionPanel } from "./wizard/provision-panel";
 import { QuickModeUI } from "./wizard/quick-mode-ui";
+import { ExistingSetupChoice } from "./wizard/existing-setup-choice";
 import { extractProfileErrors, fieldError, normalizeValues } from "./wizard/utils";
 
 export function SetupWizard() {
@@ -39,6 +48,11 @@ export function SetupWizard() {
   const [blockAds, setBlockAds] = useState(true);
   const [disguisedTrackers, setDisguisedTrackers] = useState(true);
   const [nativeTracking, setNativeTracking] = useState(true);
+  const [setupPath, setSetupPath] = useState<"checking" | "choice" | "fresh" | "retained">("checking");
+  const [existingSetup, setExistingSetup] = useState<ExistingDnsConfSetup | null>(null);
+  const [setupCheckError, setSetupCheckError] = useState("");
+  const [setupCheckVersion, setSetupCheckVersion] = useState(0);
+  const retainCredentials = setupPath === "retained";
 
   const handleGeoHideChange = useCallback((checked: boolean) => {
     setGeoHideChecked(checked);
@@ -63,8 +77,79 @@ export function SetupWizard() {
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
   const normalizedValues = normalizeValues(values);
-  const parsed = dnsConfConfigSchema.safeParse(normalizedValues);
-  const payload = useMemo(() => (parsed.success ? buildDnsConfPayload(parsed.data) : null), [parsed]);
+  const parsed = retainCredentials
+    ? retainedCredentialsConfigSchema.safeParse(normalizedValues)
+    : dnsConfConfigSchema.safeParse(normalizedValues);
+  const payload = parsed.success
+    ? buildDnsConfPayload(parsed.data as DnsConfConfig, { retainCredentials })
+    : null;
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setSetupPath("checking");
+    setSetupCheckError("");
+
+    loadExistingDnsConfSetup(createGitHubRequest(token), dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo)
+      .then((setup) => {
+        if (cancelled) return;
+        setExistingSetup(setup);
+        setSetupPath(setup ? "choice" : "fresh");
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setExistingSetup(null);
+        setSetupCheckError(error instanceof Error ? error.message : t("wizard.ghProvisionFailed"));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, setupCheckVersion]);
+
+  function configureFromScratch() {
+    form.reset(defaultDnsConfConfig);
+    setMode("quick");
+    setGeoBlock(true);
+    setGeoHideChecked(true);
+    setMalwChecked(true);
+    setBlockAds(true);
+    setDisguisedTrackers(true);
+    setNativeTracking(true);
+    setAllProfilesValid(false);
+    resetProvisionState();
+    setSetupPath("fresh");
+  }
+
+  function configureWithRetainedCredentials() {
+    const config = existingSetup?.config;
+    if (!config) return;
+
+    const hasGeoHide = config.redirects.includes(GEOHIDE_HOSTS_LIST);
+    const hasMalw = config.redirects.includes(MALW_HOSTS_LIST);
+    const hasNextDns = config.profiles.some((profile) => profile.provider === "nextdns");
+    const hasCloudflareBlocklist = [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS]
+      .some((url) => config.blocklists.includes(url));
+
+    form.reset(config);
+    setMode("quick");
+    setGeoHideChecked(hasGeoHide);
+    setMalwChecked(hasMalw);
+    setGeoBlock(hasGeoHide || hasMalw);
+    setBlockAds(!hasNextDns && hasCloudflareBlocklist);
+    setDisguisedTrackers(false);
+    setNativeTracking(false);
+    setAllProfilesValid(true);
+    resetProvisionState();
+    setSetupPath("retained");
+  }
+
+  function resetProvisionState() {
+    setStatus("idle");
+    setMessage("");
+    setResult(null);
+    setQuickSteps([]);
+  }
 
   const hasToggles = geoBlock || blockAds || disguisedTrackers || nativeTracking;
 
@@ -85,10 +170,12 @@ export function SetupWizard() {
   const canQuickProvision = useMemo(() => {
     const profiles = values.profiles ?? [];
     if (profiles.length === 0) return false;
-    if (mixedProviderIndices.size > 0) return false;
-    const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
-    return allFilled && hasToggles && !!profiles[0]?.provider && allProfilesValid && parsed.success;
-  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid, parsed.success]);
+    if (!retainCredentials && mixedProviderIndices.size > 0) return false;
+    const allFilled = retainCredentials || profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
+    const featuresReady = retainCredentials || hasToggles;
+    const credentialsReady = retainCredentials || allProfilesValid;
+    return allFilled && featuresReady && profiles.every((profile) => Boolean(profile.provider)) && credentialsReady && parsed.success;
+  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid, parsed.success, retainCredentials]);
 
   async function quickProvision() {
     if (!token) return;
@@ -101,19 +188,19 @@ export function SetupWizard() {
       return;
     }
 
-    if (profiles.length === 0 || !profiles.every(p => p.clientId && p.authSecret)) {
+    if (!retainCredentials && (profiles.length === 0 || !profiles.every(p => p.clientId && p.authSecret))) {
       setStatus("error");
       setMessage(t('wizard.fillAll'));
       return;
     }
 
-    if (!geoBlock && !blockAds && !disguisedTrackers && !nativeTracking) {
+    if (!retainCredentials && !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking) {
       setStatus("error");
       setMessage(t('wizard.enableFeature'));
       return;
     }
 
-    if (!profiles.every(p => p.provider === provider)) {
+    if (!retainCredentials && !profiles.every(p => p.provider === provider)) {
       setStatus("error");
       setMessage(t('wizard.mixedProvider'));
       return;
@@ -121,21 +208,21 @@ export function SetupWizard() {
 
     const steps: { id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[] = [];
 
-    if (provider === "nextdns") {
+    if (!retainCredentials && provider === "nextdns") {
       if (blockAds || disguisedTrackers) {
-        steps.push({ id: "blocklists", label: "Block ads & disguised trackers", status: "pending" });
+        steps.push({ id: "blocklists", label: t('quick.blocklistsStep'), status: "pending" });
       }
       if (nativeTracking) {
-        steps.push({ id: "natives", label: "Native tracking protection", status: "pending" });
+        steps.push({ id: "natives", label: t('quick.nativeStep'), status: "pending" });
       }
     }
 
     if (geoBlock) {
-      steps.push({ id: "hosts", label: "Geo-blocking hosts", status: "pending" });
+      steps.push({ id: "hosts", label: t('quick.hostsStep'), status: "pending" });
     }
 
-    steps.push({ id: "fork", label: t('wizard.fork'), status: "pending" });
-    steps.push({ id: "secrets", label: t('wizard.secrets'), status: "pending" });
+    steps.push({ id: "fork", label: t(retainCredentials ? 'wizard.syncFork' : 'wizard.fork'), status: "pending" });
+    steps.push({ id: "secrets", label: t(retainCredentials ? 'wizard.variables' : 'wizard.secrets'), status: "pending" });
     steps.push({ id: "dispatch", label: t('wizard.run'), status: "pending" });
 
     setQuickSteps(steps);
@@ -143,7 +230,7 @@ export function SetupWizard() {
     setMessage("");
 
     try {
-      if (provider === "nextdns") {
+      if (!retainCredentials && provider === "nextdns") {
         if (blockAds || disguisedTrackers) {
           setQuickSteps(prev => prev.map(s => s.id === "blocklists" ? { ...s, status: "running" } : s));
           for (const profile of profiles) {
@@ -173,36 +260,30 @@ export function SetupWizard() {
         }
       }
 
-      const blockUrls: string[] = [];
-      const redirectUrls: string[] = [];
-      if (geoBlock && geoHideChecked) {
-        redirectUrls.push(GEOHIDE_HOSTS_LIST);
-      }
-      if (geoBlock && malwChecked) {
-        redirectUrls.push(MALW_HOSTS_LIST);
-      }
-      if (blockAds && provider === "cloudflare") {
-        [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS].forEach(url => { if (!blockUrls.includes(url)) blockUrls.push(url); });
-      }
+      const config = buildQuickDnsConfConfig({
+        profiles: profiles as DnsConfConfig["profiles"],
+        existingBlocklists: values.blocklists ?? [],
+        existingRedirects: values.redirects ?? [],
+        existingRedirectExclusions: values.redirectExclusions ?? [],
+        geoBlock,
+        geoHideChecked,
+        malwChecked,
+        blockAds,
+        retainCredentials
+      });
 
-      if (redirectUrls.length > 0) {
+      if (config.redirects.length > 0) {
         setQuickSteps(prev => prev.map(s => s.id === "hosts" ? { ...s, status: "done" } : s));
       }
-
-      const config: DnsConfConfig = {
-        profiles: profiles as DnsConfConfig["profiles"],
-        blocklists: blockUrls,
-        redirects: redirectUrls,
-        redirectExclusions: []
-      };
 
       setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "running" } : s));
 
       const provisionResult = await provisionDnsConfRepository({
         ...dnsConfWorkflow,
-        payload: buildDnsConfPayload(config),
+        payload: buildDnsConfPayload(config, { retainCredentials }),
         request: createGitHubRequest(token),
         profileCount: config.profiles.length,
+        retainCredentials,
         onStep: async (step) => {
           if (step === "fork") {
             setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
@@ -229,6 +310,7 @@ export function SetupWizard() {
   const prevClientIdsJson = useRef(clientIdsJson);
 
   useEffect(() => {
+    if (retainCredentials) return;
     const prev = prevClientIdsJson.current;
     prevClientIdsJson.current = clientIdsJson;
 
@@ -252,10 +334,12 @@ export function SetupWizard() {
     if (changed) {
       form.setValue("profiles", next, { shouldDirty: true });
     }
-  }, [clientIdsJson, form.setValue]);
+  }, [clientIdsJson, form.setValue, retainCredentials]);
 
   async function provision() {
-    const parsedConfig = dnsConfConfigSchema.safeParse(normalizeValues(values));
+    const parsedConfig = retainCredentials
+      ? retainedCredentialsConfigSchema.safeParse(normalizeValues(values))
+      : dnsConfConfigSchema.safeParse(normalizeValues(values));
 
     if (!parsedConfig.success || !token) {
       setStatus("error");
@@ -269,9 +353,10 @@ export function SetupWizard() {
     try {
       const provisionResult = await provisionDnsConfRepository({
         ...dnsConfWorkflow,
-        payload: buildDnsConfPayload(parsedConfig.data),
+        payload: buildDnsConfPayload(parsedConfig.data as DnsConfConfig, { retainCredentials }),
         request: createGitHubRequest(token),
-        profileCount: parsedConfig.data.profiles.length
+        profileCount: parsedConfig.data.profiles.length,
+        retainCredentials
       });
       setResult(provisionResult);
       setStatus("done");
@@ -301,6 +386,19 @@ export function SetupWizard() {
     : (values.profiles?.[0]?.provider ?? null) === "cloudflare" ? t('profiles.providerCloudflare')
     : null;
 
+  if (setupPath === "checking" || setupPath === "choice") {
+    return (
+      <ExistingSetupChoice
+        loading={setupPath === "checking" && !setupCheckError}
+        error={setupCheckError}
+        setup={existingSetup}
+        onRetry={() => setSetupCheckVersion((version) => version + 1)}
+        onConfigureFromScratch={configureFromScratch}
+        onRetainCredentials={configureWithRetainedCredentials}
+      />
+    );
+  }
+
   return (
     <section aria-labelledby="setup-title">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -313,7 +411,7 @@ export function SetupWizard() {
       {mode === "expert" ? (
         <div className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5">
-            <CredsGuide />
+            {!retainCredentials ? <CredsGuide /> : null}
             <SourcesSection
               blocklists={values.blocklists}
               redirects={values.redirects}
@@ -330,20 +428,22 @@ export function SetupWizard() {
               profileSecretErrors={extractProfileErrors(parsed, "authSecret")}
               profileDonorErrors={extractProfileErrors(parsed, "donorDns")}
               onValidChange={setAllProfilesValid}
+              retainCredentials={retainCredentials}
             />
           </div>
 
           <aside className="space-y-5">
-            <ReviewPanel payload={payload} valid={parsed.success} />
+            <ReviewPanel payload={payload} valid={parsed.success} retainCredentials={retainCredentials} />
             <ProvisionPanel
               status={status}
               message={message}
               result={result}
               onProvision={provision}
-              disabled={!parsed.success || status === "running" || !allProfilesValid}
+              disabled={!parsed.success || status === "running" || (!retainCredentials && !allProfilesValid)}
               starred={starred}
               starring={starring}
               onStar={handleStar}
+              retainCredentials={retainCredentials}
             />
           </aside>
         </div>
@@ -354,7 +454,6 @@ export function SetupWizard() {
             setMode={setMode}
             profiles={values.profiles ?? []}
             providerLabel={providerLabel}
-            providerValue={values.profiles?.[0]?.provider ?? null}
             setValue={form.setValue}
             profileClientIdErrors={extractProfileErrors(parsed, "clientId")}
             profileSecretErrors={extractProfileErrors(parsed, "authSecret")}
@@ -382,6 +481,7 @@ export function SetupWizard() {
             starred={starred}
             starring={starring}
             onStar={handleStar}
+            retainCredentials={retainCredentials}
           />
         </div>
       )}
@@ -390,3 +490,49 @@ export function SetupWizard() {
 }
 
 export { parseExcludeDomains } from "./wizard/utils";
+
+export function buildQuickDnsConfConfig({
+  profiles,
+  existingBlocklists,
+  existingRedirects,
+  existingRedirectExclusions,
+  geoBlock,
+  geoHideChecked,
+  malwChecked,
+  blockAds,
+  retainCredentials
+}: {
+  profiles: DnsConfConfig["profiles"];
+  existingBlocklists: string[];
+  existingRedirects: string[];
+  existingRedirectExclusions: string[];
+  geoBlock: boolean;
+  geoHideChecked: boolean;
+  malwChecked: boolean;
+  blockAds: boolean;
+  retainCredentials: boolean;
+}): DnsConfConfig {
+  const cloudflareBlocklists = [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS];
+  const canEditBlockAds = !retainCredentials || profiles.every((profile) => profile.provider === "cloudflare");
+  const blocklists = retainCredentials
+    ? existingBlocklists.filter((url) => !canEditBlockAds || !cloudflareBlocklists.includes(url))
+    : [];
+  const redirects = retainCredentials
+    ? existingRedirects.filter((url) => url !== GEOHIDE_HOSTS_LIST && url !== MALW_HOSTS_LIST)
+    : [];
+
+  if (geoBlock && geoHideChecked) redirects.push(GEOHIDE_HOSTS_LIST);
+  if (geoBlock && malwChecked) redirects.push(MALW_HOSTS_LIST);
+  if (blockAds && profiles.some((profile) => profile.provider === "cloudflare")) {
+    cloudflareBlocklists.forEach((url) => {
+      if (!blocklists.includes(url)) blocklists.push(url);
+    });
+  }
+
+  return {
+    profiles,
+    blocklists,
+    redirects,
+    redirectExclusions: retainCredentials ? existingRedirectExclusions : []
+  };
+}

@@ -16,7 +16,6 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
     setMode: vi.fn(),
     profiles: [{ clientId: "abc123", authSecret: "secret", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
     providerLabel: "NextDNS",
-    providerValue: "nextdns",
     setValue: vi.fn() as ComponentProps<typeof QuickModeUI>["setValue"],
     mixedProviderIndices: new Set(),
     geoBlock: false,
@@ -62,5 +61,21 @@ describe("QuickModeUI", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "GeoHide" }));
 
     expect(onGeoHideChange).toHaveBeenCalledWith(true);
+  });
+
+  it("disables direct NextDNS API settings when GitHub credentials are retained", () => {
+    renderQuickMode({
+      retainCredentials: true,
+      profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
+      blockAds: false,
+      disguisedTrackers: false,
+      nativeTracking: false
+    });
+
+    expect(screen.getByRole("checkbox", { name: "Блокировка рекламы и трекеров" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Блокировка скрытых сторонних трекеров" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Защита от встроенного отслеживания" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Обход гео-блокировок" })).toBeEnabled();
+    expect(screen.getAllByRole("note", { name: /нельзя прочитать или изменить без прямого доступа к API NextDNS/ })).toHaveLength(3);
   });
 });

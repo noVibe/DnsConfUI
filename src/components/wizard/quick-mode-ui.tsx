@@ -15,7 +15,6 @@ export function QuickModeUI({
   setMode,
   profiles,
   providerLabel,
-  providerValue,
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
@@ -42,13 +41,13 @@ export function QuickModeUI({
   result,
   starred,
   starring,
-  onStar
+  onStar,
+  retainCredentials = false
 }: {
   mode: "quick" | "expert";
   setMode: (m: "quick" | "expert") => void;
   profiles: DnsConfConfig["profiles"];
   providerLabel: string | null;
-  providerValue: string | null;
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
@@ -76,15 +75,16 @@ export function QuickModeUI({
   starred: boolean;
   starring: boolean;
   onStar: () => Promise<void>;
+  retainCredentials?: boolean;
 }) {
   const { t } = useLocale();
-  const isNextDNS = providerValue === "nextdns";
+  const hasNextDns = profiles.some((profile) => profile.provider === "nextdns");
   const noToggles = !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
       <div className="space-y-5">
-        <CredsGuide />
+        {!retainCredentials ? <CredsGuide /> : null}
          <ProfilesSection
             profiles={profiles}
             setValue={setValue}
@@ -94,6 +94,7 @@ export function QuickModeUI({
             mixedProviderIndices={mixedProviderIndices}
             simplified
             onValidChange={onProfilesValidChange}
+            retainCredentials={retainCredentials}
           />
 
         {providerLabel ? (
@@ -133,32 +134,35 @@ export function QuickModeUI({
               onChange={onBlockAdsChange}
               label={t('quick.blockAds')}
               tooltip={
-                isNextDNS
-                  ? t('quick.blockAdsNdTooltip')
+                hasNextDns
+                  ? `${t('quick.blockAdsNdTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`
                   : t('quick.blockAdsCfTooltip')
               }
+              disabled={retainCredentials && hasNextDns}
             />
 
-            {isNextDNS ? (
+            {hasNextDns ? (
               <ToggleSwitch
                 checked={disguisedTrackers}
                 onChange={onDisguisedTrackersChange}
                 label={t('quick.disguised')}
-                tooltip={t('quick.disguisedTooltip')}
+                tooltip={`${t('quick.disguisedTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`}
+                disabled={retainCredentials}
               />
             ) : null}
 
-            {isNextDNS ? (
+            {hasNextDns ? (
               <ToggleSwitch
                 checked={nativeTracking}
                 onChange={onNativeTrackingChange}
                 label={t('quick.native')}
-                tooltip={t('quick.nativeTooltip')}
+                tooltip={`${t('quick.nativeTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`}
+                disabled={retainCredentials}
               />
             ) : null}
 
-            {noToggles && status === "idle" ? (
-              <p className="text-sm leading-5 text-coral">Enable at least one feature.</p>
+            {!retainCredentials && noToggles && status === "idle" ? (
+              <p className="text-sm leading-5 text-coral">{t('wizard.enableFeature')}</p>
             ) : null}
           </section>
         ) : null}
@@ -203,6 +207,7 @@ export function QuickModeUI({
           starred={starred}
           starring={starring}
           onStar={onStar}
+          retainCredentials={retainCredentials}
         />
       </aside>
     </div>

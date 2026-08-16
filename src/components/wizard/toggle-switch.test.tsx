@@ -27,4 +27,19 @@ describe("ToggleSwitch", () => {
     fireEvent.click(screen.getByText("DNS donor"));
     expect(onChange).toHaveBeenCalledWith(true);
   });
+
+  it("keeps the tooltip available while disabling credential-dependent settings", () => {
+    render(
+      <ToggleSwitch
+        checked={false}
+        onChange={vi.fn()}
+        label="NextDNS API setting"
+        tooltip="Credentials are required"
+        disabled
+      />,
+    );
+
+    expect(screen.getByRole("checkbox", { name: "NextDNS API setting" })).toBeDisabled();
+    expect(screen.getByRole("note", { name: "Credentials are required" })).toBeVisible();
+  });
 });

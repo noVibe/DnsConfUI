@@ -237,6 +237,20 @@ describe("buildDnsConfPayload", () => {
     expect(payload.variables.REDIRECT).toBe("https://redir.a,https://redir.b");
     expect(payload.variables.EXCLUDE_REDIRECT).toBe("ex.a,ex.b,ex.c");
   });
+
+  it("builds variables without requiring or returning retained credentials", () => {
+    const payload = buildDnsConfPayload({
+      ...validConfig,
+      profiles: [
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: "" },
+        { clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }
+      ]
+    }, { retainCredentials: true });
+
+    expect(payload.secrets).toEqual({});
+    expect(payload.variables.DNS).toBe("nextdns,cloudflare");
+    expect(payload.variables.DONOR_DNS).toBe(`-,${DEFAULT_DNS_DONOR}`);
+  });
 });
 
 describe("getWizardStepValidity", () => {

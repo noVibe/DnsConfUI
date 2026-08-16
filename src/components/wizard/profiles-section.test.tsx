@@ -117,6 +117,25 @@ describe("ProfilesSection", () => {
     expect(screen.getByPlaceholderText("IPv4-адрес или DoH URL")).toHaveValue("1.1.1.1");
   });
 
+  it("shows retained profiles without exposing credential or profile controls", () => {
+    renderSection({
+      profiles: [
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR },
+        { clientId: "", authSecret: "", provider: "cloudflare", donorDns: "" }
+      ],
+      retainCredentials: true
+    });
+
+    expect(screen.queryByRole("button", { name: "Добавить профиль" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Удалить профиль" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /CLIENT_ID/ })).not.toBeInTheDocument();
+    expect(screen.getByText("DNS: NextDNS")).toBeVisible();
+    expect(screen.getByText("CLIENT_ID и AUTH_SECRET остаются в GitHub Secrets.")).toBeVisible();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "1" } });
+    expect(screen.getByText("DNS: Cloudflare")).toBeVisible();
+  });
+
   it("validates complete credentials after the debounce delay", async () => {
     vi.useFakeTimers();
     apiMocks.validateCredentials.mockResolvedValue({ valid: true });

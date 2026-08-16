@@ -1,5 +1,10 @@
 import { Octokit } from "@octokit/core";
-import type { DnsConfPayload } from "@/domain/dnsconf-config";
+import type { DnsConfConfig, DnsConfPayload } from "@/domain/dnsconf-config";
+import {
+  configFromDnsConfVariables,
+  DNSCONF_VARIABLE_NAMES,
+  type DnsConfVariables
+} from "@/domain/existing-dnsconf-config";
 import { encryptGitHubSecret } from "./crypto";
 
 type GitHubRequest = (route: string, parameters?: Record<string, unknown>) => Promise<{ data?: unknown }>;
@@ -17,6 +22,7 @@ export type ProvisionDnsConfInput = {
   encryptSecret?: EncryptSecret;
   onStep?: (step: ProvisionStep) => Promise<void> | void;
   profileCount?: number;
+  retainCredentials?: boolean;
 };
 
 export type ProvisionResult = {
@@ -28,10 +34,17 @@ export type ProvisionResult = {
   workflowRunId?: number;
 };
 
+export type ExistingDnsConfSetup = {
+  repository: { owner: string; repo: string };
+  variables: DnsConfVariables;
+  config: DnsConfConfig | null;
+};
+
 type RepoResponse = {
   owner?: { login?: string };
   name?: string;
   fork?: boolean;
+  parent?: { full_name?: string };
 };
 
 type PublicKeyResponse = {
@@ -56,36 +69,37 @@ export async function provisionDnsConfRepository({
   request,
   encryptSecret = encryptGitHubSecret,
   onStep,
-  profileCount = 1
+  profileCount = 1,
+  retainCredentials = false
 }: ProvisionDnsConfInput): Promise<ProvisionResult> {
   const user = await getAuthenticatedUser(request);
   const { owner, repo } = await ensureFork(request, sourceOwner, sourceRepo, user);
   await onStep?.("fork");
 
-  const publicKey = await request("GET /repos/{owner}/{repo}/actions/secrets/public-key", {
-    owner,
-    repo
-  });
-  const { key, key_id: keyId } = publicKey.data as PublicKeyResponse;
+  if (!retainCredentials) {
+    const publicKey = await request("GET /repos/{owner}/{repo}/actions/secrets/public-key", {
+      owner,
+      repo
+    });
+    const { key, key_id: keyId } = publicKey.data as PublicKeyResponse;
 
-  await Promise.all(
-    Object.entries(payload.secrets).map(async ([name, value]) => {
-      const encrypted = await encryptSecret(value, key);
+    await Promise.all(
+      Object.entries(payload.secrets).map(async ([name, value]) => {
+        const encrypted = await encryptSecret(value, key);
 
-      await request("PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}", {
-        owner,
-        repo,
-        secret_name: name,
-        encrypted_value: encrypted,
-        key_id: keyId
-      });
-    })
-  );
+        await request("PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}", {
+          owner,
+          repo,
+          secret_name: name,
+          encrypted_value: encrypted,
+          key_id: keyId
+        });
+      })
+    );
+  }
 
   for (const [name, value] of Object.entries(payload.variables)) {
-    if (value) {
-      await upsertVariable(request, owner, repo, name, value);
-    }
+    await upsertVariable(request, owner, repo, name, value);
   }
 
   await enableActionsIfDisabled(request, owner, repo);
@@ -115,6 +129,37 @@ export async function provisionDnsConfRepository({
   return { repository: { owner, repo }, workflowRunUrl, workflowRunId };
 }
 
+export async function loadExistingDnsConfSetup(
+  request: GitHubRequest,
+  sourceOwner: string,
+  sourceRepo: string
+): Promise<ExistingDnsConfSetup | null> {
+  const user = await getAuthenticatedUser(request);
+  const repository = await findExistingFork(request, user, sourceOwner, sourceRepo);
+  if (!repository) return null;
+
+  const response = await request("GET /repos/{owner}/{repo}/actions/variables", {
+    owner: repository.owner,
+    repo: repository.repo,
+    per_page: 30
+  });
+  const data = response.data as { variables?: Array<{ name?: string; value?: string }> };
+  const variables: DnsConfVariables = {};
+
+  for (const variable of data.variables ?? []) {
+    const name = variable.name as typeof DNSCONF_VARIABLE_NAMES[number] | undefined;
+    if (name && DNSCONF_VARIABLE_NAMES.includes(name)) {
+      variables[name] = variable.value ?? "";
+    }
+  }
+
+  return {
+    repository,
+    variables,
+    config: configFromDnsConfVariables(variables)
+  };
+}
+
 async function getAuthenticatedUser(request: GitHubRequest): Promise<string> {
   const response = await request("GET /user");
   const data = response.data as { login: string };
@@ -124,15 +169,17 @@ async function getAuthenticatedUser(request: GitHubRequest): Promise<string> {
 async function findExistingFork(
   request: GitHubRequest,
   user: string,
+  sourceOwner: string,
   repo: string
 ): Promise<{ owner: string; repo: string } | null> {
   try {
     const response = await request("GET /repos/{owner}/{repo}", { owner: user, repo });
     const data = response.data as RepoResponse;
-    if (data.fork) {
+    if (data.fork && data.parent?.full_name?.toLowerCase() === `${sourceOwner}/${repo}`.toLowerCase()) {
       return { owner: user, repo };
     }
-  } catch {
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
   }
   return null;
 }
@@ -143,7 +190,7 @@ async function ensureFork(
   sourceRepo: string,
   user: string
 ): Promise<{ owner: string; repo: string }> {
-  const existing = await findExistingFork(request, user, sourceRepo);
+  const existing = await findExistingFork(request, user, sourceOwner, sourceRepo);
   if (existing) {
     await request("POST /repos/{owner}/{repo}/merge-upstream", {
       owner: existing.owner,
@@ -160,7 +207,7 @@ async function ensureFork(
     });
   } catch (error) {
     if (isAlreadyExistsError(error)) {
-      const found = await findExistingFork(request, user, sourceRepo);
+      const found = await findExistingFork(request, user, sourceOwner, sourceRepo);
       if (found) {
         return found;
       }
@@ -318,4 +365,10 @@ function isAlreadyExistsError(error: unknown): boolean {
   const message = candidate.message?.toLowerCase() ?? "";
 
   return status === 409 || (status === 422 && message.includes("already"));
+}
+
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as { status?: number; response?: { status?: number } };
+  return (candidate.status ?? candidate.response?.status) === 404;
 }

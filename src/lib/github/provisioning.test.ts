@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { provisionDnsConfRepository, starRepository } from "./provisioning";
+import { loadExistingDnsConfSetup, provisionDnsConfRepository, starRepository } from "./provisioning";
 
 describe("provisionDnsConfRepository", () => {
   it("forks DnsConf, uploads encrypted secrets, upserts variables, and dispatches the workflow", async () => {
@@ -12,7 +12,7 @@ describe("provisionDnsConfRepository", () => {
         if (!forkExists) {
           throw Object.assign(new Error("Not found"), { status: 404 });
         }
-        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "POST /repos/{owner}/{repo}/forks") {
         forkExists = true;
@@ -92,7 +92,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { login: "alice" } };
       }
       if (route === "GET /repos/{owner}/{repo}") {
-        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
         return { data: { key: "public-key", key_id: "key-id" } };
@@ -138,7 +138,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { login: "alice" } };
       }
       if (route === "GET /repos/{owner}/{repo}") {
-        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "POST /repos/{owner}/{repo}/merge-upstream") {
         throw new Error("Fork has conflicts");
@@ -174,7 +174,7 @@ describe("provisionDnsConfRepository", () => {
         if (!forkExists) {
           throw Object.assign(new Error("Not found"), { status: 404 });
         }
-        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "POST /repos/{owner}/{repo}/forks") {
         forkExists = true;
@@ -231,7 +231,7 @@ describe("provisionDnsConfRepository", () => {
         if (!forkExists) {
           throw Object.assign(new Error("Not found"), { status: 404 });
         }
-        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true } };
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "POST /repos/{owner}/{repo}/forks") {
         forkExists = true;
@@ -281,7 +281,7 @@ describe("provisionDnsConfRepository", () => {
   it("reports a failed workflow conclusion", async () => {
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") return { data: { login: "alice" } };
-      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
@@ -307,11 +307,11 @@ describe("provisionDnsConfRepository", () => {
     })).rejects.toThrow("Workflow run finished with conclusion: failure");
   });
 
-  it("skips empty variables and reports provisioning steps in order", async () => {
+  it("writes empty variables so existing repository values can be cleared", async () => {
     const steps: string[] = [];
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") return { data: { login: "alice" } };
-      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
@@ -341,16 +341,16 @@ describe("provisionDnsConfRepository", () => {
     });
 
     expect(steps).toEqual(["fork", "secrets", "dispatch"]);
-    expect(request).not.toHaveBeenCalledWith(
+    expect(request).toHaveBeenCalledWith(
       "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ name: "BLOCK" }),
+      expect.objectContaining({ name: "BLOCK", value: "" }),
     );
   });
 
   it("rethrows variable creation errors that are not conflicts", async () => {
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") return { data: { login: "alice" } };
-      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
@@ -371,6 +371,120 @@ describe("provisionDnsConfRepository", () => {
       request,
       encryptSecret: async (value) => `encrypted:${value}`,
     })).rejects.toThrow("server error");
+  });
+
+  it("retains existing GitHub secrets while updating variables", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 7, html_url: "https://example.test/run/7" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
+      return { data: {} };
+    });
+    const encryptSecret = vi.fn(async (value: string) => `encrypted:${value}`);
+
+    await provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: {},
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+      },
+      request,
+      encryptSecret,
+      retainCredentials: true
+    });
+
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/secrets/public-key",
+      expect.anything()
+    );
+    expect(request).not.toHaveBeenCalledWith(
+      "PUT /repos/{owner}/{repo}/actions/secrets/{secret_name}",
+      expect.anything()
+    );
+    expect(encryptSecret).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/actions/variables",
+      expect.objectContaining({ name: "DONOR_DNS", value: "-" })
+    );
+  });
+});
+
+describe("loadExistingDnsConfSetup", () => {
+  it("loads readable variables and derives profiles from DNS", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      if (route === "GET /repos/{owner}/{repo}/actions/variables") {
+        return { data: { variables: [
+          { name: "DNS", value: "nextdns,cloudflare" },
+          { name: "DONOR_DNS", value: "-,https://dns.comss.one/dns-query" },
+          { name: "UNRELATED", value: "ignored" }
+        ] } };
+      }
+      return { data: {} };
+    });
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf");
+
+    expect(result?.repository).toEqual({ owner: "alice", repo: "DnsConf" });
+    expect(result?.variables).toEqual({
+      DNS: "nextdns,cloudflare",
+      DONOR_DNS: "-,https://dns.comss.one/dns-query"
+    });
+    expect(result?.config?.profiles).toEqual([
+      { clientId: "", authSecret: "", provider: "nextdns", donorDns: "" },
+      { clientId: "", authSecret: "", provider: "cloudflare", donorDns: "https://dns.comss.one/dns-query" }
+    ]);
+    expect(request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/actions/variables", {
+      owner: "alice",
+      repo: "DnsConf",
+      per_page: 30
+    });
+  });
+
+  it("returns null when the user has no fork", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      throw Object.assign(new Error("Not found"), { status: 404 });
+    });
+
+    await expect(loadExistingDnsConfSetup(request, "noVibe", "DnsConf")).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/variables",
+      expect.anything()
+    );
+  });
+
+  it("ignores a same-named fork that does not belong to the DnsConf upstream", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { fork: true, parent: { full_name: "someone-else/DnsConf" } } };
+      }
+      return { data: {} };
+    });
+
+    await expect(loadExistingDnsConfSetup(request, "noVibe", "DnsConf")).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/variables",
+      expect.anything()
+    );
+  });
+
+  it("does not hide repository lookup failures as a missing fork", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      throw Object.assign(new Error("GitHub unavailable"), { status: 503 });
+    });
+
+    await expect(loadExistingDnsConfSetup(request, "noVibe", "DnsConf")).rejects.toThrow("GitHub unavailable");
   });
 });
 

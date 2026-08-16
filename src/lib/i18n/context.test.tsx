@@ -8,6 +8,7 @@ function DonorTooltipHarness() {
   return (
     <>
       <span data-testid="donor-tooltip">{t("profiles.donorTooltip")}</span>
+      <span data-testid="retained-tooltip">{t("quick.requiresCredentials")}</span>
       <button type="button" onClick={() => setLocale(locale === "ru" ? "en" : "ru")}>Switch</button>
     </>
   );
@@ -22,9 +23,11 @@ describe("LocaleProvider", () => {
     );
 
     expect(screen.getByTestId("donor-tooltip")).toHaveTextContent("Запрашивает у этого DNS-резолвера");
+    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("нельзя прочитать или изменить без прямого доступа к API NextDNS");
 
     fireEvent.click(screen.getByRole("button", { name: "Switch" }));
 
     expect(screen.getByTestId("donor-tooltip")).toHaveTextContent("Queries this DNS resolver");
+    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("cannot be read or changed without direct NextDNS API access");
   });
 });

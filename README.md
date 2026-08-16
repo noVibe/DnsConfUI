@@ -28,6 +28,18 @@ The application has no backend, no database, and never sees your provider secret
 Configure several DNS profiles in one go. Each profile has its own CLIENT_ID, AUTH_SECRET,
 DNS provider, and optional DNS donor — useful when managing multiple Cloudflare / NextDNS accounts.
 
+## Updating an existing setup
+
+After GitHub authorization, the UI checks whether the user already has a DnsConf fork. Existing
+repository variables are loaded to restore profile order, DNS providers, donors, and source lists.
+The user can either configure everything again or keep the existing `CLIENT_ID` and `AUTH_SECRET`
+values in GitHub Actions Secrets.
+
+When saved credentials are retained, the UI never reads or rewrites those secrets. Profile cards
+show only their position and DNS provider, while donor and repository-variable settings remain
+editable. Quick-mode NextDNS settings that require direct API access are disabled until the user
+chooses a full reconfiguration and provides the credentials again.
+
 ## DNS donor
 
 Quick mode enables GeoHide by default and also offers Xbox and Comss presets. Expert mode accepts

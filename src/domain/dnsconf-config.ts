@@ -4,6 +4,12 @@ import { DEFAULT_DNS_DONOR, DISABLED_DNS_DONOR } from "./dns-donors";
 
 const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
 
+const sourceConfigFields = {
+  blocklists: z.array(z.string().trim().url("Enter a valid URL")).default([]),
+  redirects: z.array(z.string().trim().url("Enter a valid URL")).default([]),
+  redirectExclusions: z.array(z.string().trim().min(1, "Enter a domain name").refine(v => !v.includes("://"), "Use a domain name, not a URL")).default([])
+};
+
 export const profileSchema = z.object({
   clientId: z.string().trim().min(1, "validation.clientIdRequired"),
   authSecret: z.string().trim().min(1, "validation.authSecretRequired"),
@@ -17,9 +23,7 @@ export const profileSchema = z.object({
 export const dnsConfConfigSchema = z
   .object({
     profiles: z.array(profileSchema).min(1),
-    blocklists: z.array(z.string().trim().url("Enter a valid URL")).default([]),
-    redirects: z.array(z.string().trim().url("Enter a valid URL")).default([]),
-    redirectExclusions: z.array(z.string().trim().min(1, "Enter a domain name").refine(v => !v.includes("://"), "Use a domain name, not a URL")).default([])
+    ...sourceConfigFields
   })
   .superRefine((data, ctx) => {
     for (const [index, profile] of data.profiles.entries()) {
@@ -36,12 +40,21 @@ export const dnsConfConfigSchema = z
     }
   });
 
+export const retainedCredentialsConfigSchema = z.object({
+  profiles: z.array(profileSchema.extend({
+    clientId: z.literal(""),
+    authSecret: z.literal(""),
+    provider: dnsProviderSchema
+  })).min(1),
+  ...sourceConfigFields
+});
+
 export type DnsConfConfig = z.infer<typeof dnsConfConfigSchema>;
 
 export type Profile = z.infer<typeof profileSchema>;
 
 export type DnsConfPayload = {
-  secrets: Record<"CLIENT_ID" | "AUTH_SECRET", string>;
+  secrets: Partial<Record<"CLIENT_ID" | "AUTH_SECRET", string>>;
   variables: Record<"DNS" | "BLOCK" | "REDIRECT" | "EXCLUDE_REDIRECT" | "DONOR_DNS", string>;
 };
 
@@ -52,11 +65,16 @@ export const defaultDnsConfConfig: DnsConfConfig = {
   redirectExclusions: []
 };
 
-export function buildDnsConfPayload(config: DnsConfConfig): DnsConfPayload {
-  const parsed = dnsConfConfigSchema.parse(config);
+export function buildDnsConfPayload(
+  config: DnsConfConfig,
+  options: { retainCredentials?: boolean } = {}
+): DnsConfPayload {
+  const parsed = options.retainCredentials
+    ? retainedCredentialsConfigSchema.parse(config)
+    : dnsConfConfigSchema.parse(config);
 
   return {
-    secrets: {
+    secrets: options.retainCredentials ? {} : {
       CLIENT_ID: parsed.profiles.map(p => p.clientId).join(","),
       AUTH_SECRET: parsed.profiles.map(p => p.authSecret).join(",")
     },
