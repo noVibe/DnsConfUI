@@ -61,6 +61,7 @@ describe("ProfilesSection", () => {
     expect(screen.getByRole("checkbox", { name: "DNS-донор" })).toBeChecked();
     expect(screen.getByText("DNS-донор", { selector: "label" })).toHaveClass("whitespace-nowrap");
     expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue(DEFAULT_DNS_DONOR);
+    expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveAttribute("title", DEFAULT_DNS_DONOR);
   });
 
   it("disables the donor without changing other profile fields", () => {

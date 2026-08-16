@@ -234,6 +234,7 @@ export function ProfilesSection({
                   value={profiles[selected].donorDns}
                   onChange={(e) => update(selected, "donorDns", e.target.value)}
                   aria-label={t('profiles.donor')}
+                  title={profiles[selected].donorDns}
                 >
                   {!isDnsDonorPreset(profiles[selected].donorDns) ? (
                     <option value={profiles[selected].donorDns}>
