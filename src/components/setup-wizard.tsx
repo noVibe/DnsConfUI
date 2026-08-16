@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -21,6 +22,7 @@ import {
   type ProvisionResult
 } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
+import { SecondaryButton } from "@/components/ui";
 import { useAuth } from "./auth-provider";
 import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
 import { ModeTabs } from "./wizard/mode-tabs";
@@ -52,6 +54,7 @@ export function SetupWizard() {
   const [existingSetup, setExistingSetup] = useState<ExistingDnsConfSetup | null>(null);
   const [setupCheckError, setSetupCheckError] = useState("");
   const [setupCheckVersion, setSetupCheckVersion] = useState(0);
+  const [canReturnToRetainedSetup, setCanReturnToRetainedSetup] = useState(false);
   const retainCredentials = setupPath === "retained";
   const retainedCustomRedirects = retainCredentials
     ? existingSetup?.config?.redirects.filter(
@@ -113,6 +116,16 @@ export function SetupWizard() {
   }, [token, setupCheckVersion]);
 
   function configureFromScratch() {
+    setCanReturnToRetainedSetup(false);
+    initializeFullSetup();
+  }
+
+  function configureFromRetainedSetup() {
+    setCanReturnToRetainedSetup(true);
+    initializeFullSetup();
+  }
+
+  function initializeFullSetup() {
     form.reset(defaultDnsConfConfig);
     setMode("quick");
     setGeoBlock(true);
@@ -145,6 +158,7 @@ export function SetupWizard() {
     setDisguisedTrackers(false);
     setNativeTracking(false);
     setAllProfilesValid(true);
+    setCanReturnToRetainedSetup(false);
     resetProvisionState();
     setSetupPath("retained");
   }
@@ -412,7 +426,19 @@ export function SetupWizard() {
         <h2 id="setup-title" className="text-2xl font-semibold text-ink">
           {t('wizard.setup')}
         </h2>
-        <ModeTabs mode={mode} setMode={setMode} />
+        <div className="flex flex-wrap items-center gap-2">
+          {canReturnToRetainedSetup ? (
+            <SecondaryButton
+              type="button"
+              onClick={configureWithRetainedCredentials}
+              className="min-h-9 py-1.5"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              {t('existing.returnToRetained')}
+            </SecondaryButton>
+          ) : null}
+          <ModeTabs mode={mode} setMode={setMode} />
+        </div>
       </div>
 
       {mode === "expert" ? (
@@ -490,7 +516,7 @@ export function SetupWizard() {
             starring={starring}
             onStar={handleStar}
             retainCredentials={retainCredentials}
-            onConfigureFromScratch={configureFromScratch}
+            onConfigureFromScratch={configureFromRetainedSetup}
           />
         </div>
       )}

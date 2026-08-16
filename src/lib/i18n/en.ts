@@ -71,6 +71,7 @@ export const locale = {
   "existing.retainTitle": "Keep saved credentials",
   "existing.retainDesc": "Keep CLIENT_ID and AUTH_SECRET in GitHub and edit only settings that do not require direct provider API access.",
   "existing.noDnsVariable": "The DNS variable is missing or invalid, so profile order cannot be restored safely.",
+  "existing.returnToRetained": "Back to setup without re-entering credentials",
 
   "profiles.title": "Profiles",
   "profiles.select": "Select profile",
