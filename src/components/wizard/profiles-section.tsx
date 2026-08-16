@@ -37,15 +37,19 @@ export function ProfilesSection({
   const [selected, setSelected] = useState(0);
   const [credStatus, setCredStatus] = useState<Record<number, { status: "idle" | "validating" | "valid" | "invalid"; message?: string }>>({});
   const validateTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const validationVersions = useRef<Record<number, number>>({});
   useEffect(() => () => { Object.values(validateTimers.current).forEach(clearTimeout); }, []);
 
   useEffect(() => {
     const p = profiles[selected];
     const detected = p?.clientId?.length === CLOUDFLARE_CLIENT_ID_LENGTH ? "cloudflare" : p?.clientId?.length === NEXTDNS_CLIENT_ID_LENGTH ? "nextdns" : null;
     if (!detected || !p?.authSecret?.trim() || credStatus[selected]) return;
+    const version = (validationVersions.current[selected] ?? 0) + 1;
+    validationVersions.current[selected] = version;
     const timer = setTimeout(async () => {
       setCredStatus(prev => ({ ...prev, [selected]: { status: "validating" } }));
       const result = await validateCredentials(p.clientId, p.authSecret, detected);
+      if (validationVersions.current[selected] !== version) return;
       setCredStatus(prev => ({
         ...prev,
         [selected]: result.valid
@@ -75,6 +79,13 @@ export function ProfilesSection({
 
     const timer = validateTimers.current[index];
     if (timer) clearTimeout(timer);
+    const version = (validationVersions.current[index] ?? 0) + 1;
+    validationVersions.current[index] = version;
+    setCredStatus(prev => {
+      const cleared = { ...prev };
+      delete cleared[index];
+      return cleared;
+    });
 
     const p = next[index];
     const len = p?.clientId?.length ?? 0;
@@ -84,6 +95,7 @@ export function ProfilesSection({
     validateTimers.current[index] = setTimeout(async () => {
       setCredStatus(prev => ({ ...prev, [index]: { status: "validating" } }));
       const result = await validateCredentials(p.clientId, p.authSecret, detected);
+      if (validationVersions.current[index] !== version) return;
       setCredStatus(prev => ({
         ...prev,
         [index]: result.valid

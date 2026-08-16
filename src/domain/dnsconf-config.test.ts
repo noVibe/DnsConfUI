@@ -109,6 +109,57 @@ describe("dnsConfConfigSchema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it.each(["0.0.0.0", "1.1.1.1", "255.255.255.255"])("accepts valid donor IPv4 address %s", (donorDns) => {
+    const result = dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      profiles: [{ ...validConfig.profiles[0], donorDns }]
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it.each(["256.1.1.1", "1.1.1", "01.1.1.1", "1.1.1.-1"])("rejects invalid donor IPv4 address %s", (donorDns) => {
+    const result = dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      profiles: [{ ...validConfig.profiles[0], donorDns }]
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsupported DNS donor URL protocols", () => {
+    const result = dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      profiles: [{ ...validConfig.profiles[0], donorDns: "ftp://dns.example/dns-query" }]
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unencrypted HTTP donor URL", () => {
+    const result = dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      profiles: [{ ...validConfig.profiles[0], donorDns: "http://dns.example/dns-query" }]
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires at least one profile", () => {
+    expect(dnsConfConfigSchema.safeParse({ ...validConfig, profiles: [] }).success).toBe(false);
+  });
+
+  it("accepts domain exclusions and rejects URL exclusions", () => {
+    expect(dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      redirectExclusions: ["example.com", "sub.example.com"]
+    }).success).toBe(true);
+    expect(dnsConfConfigSchema.safeParse({
+      ...validConfig,
+      redirectExclusions: ["https://example.com"]
+    }).success).toBe(false);
+  });
 });
 
 describe("buildDnsConfPayload", () => {
@@ -194,5 +245,27 @@ describe("getWizardStepValidity", () => {
     expect(getWizardStepValidity(1, { profiles: [{ clientId: "id", authSecret: "secret", provider: "", donorDns: DEFAULT_DNS_DONOR }] })).toBe(false);
     expect(getWizardStepValidity(2, { ...validConfig, profiles: [{ clientId: "id", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }] })).toBe(false);
     expect(getWizardStepValidity(3, { ...validConfig, blocklists: [] })).toBe(true);
+  });
+
+  it("validates redirect inputs on step 4", () => {
+    expect(getWizardStepValidity(4, {
+      redirects: ["https://example.com/hosts"],
+      redirectExclusions: ["keep.example"]
+    })).toBe(true);
+    expect(getWizardStepValidity(4, {
+      redirects: ["not-a-url"],
+      redirectExclusions: ["keep.example"]
+    })).toBe(false);
+  });
+
+  it("requires the complete schema on review and provisioning steps", () => {
+    expect(getWizardStepValidity(5, validConfig)).toBe(true);
+    expect(getWizardStepValidity(6, validConfig)).toBe(true);
+    expect(getWizardStepValidity(5, { ...validConfig, profiles: [] })).toBe(false);
+  });
+
+  it("rejects unknown steps", () => {
+    expect(getWizardStepValidity(0, validConfig)).toBe(false);
+    expect(getWizardStepValidity(7, validConfig)).toBe(false);
   });
 });

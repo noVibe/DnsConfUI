@@ -15,7 +15,6 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
-  localStorage.setItem(STORAGE_KEY, theme);
 }
 
 function readInitialTheme(): Theme {
@@ -28,6 +27,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
+    const initialTheme = readInitialTheme();
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
+
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
       if (!localStorage.getItem(STORAGE_KEY)) {
@@ -44,6 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((prev) => {
       const next = prev === "light" ? "dark" : "light";
       applyTheme(next);
+      localStorage.setItem(STORAGE_KEY, next);
       return next;
     });
   }, []);
