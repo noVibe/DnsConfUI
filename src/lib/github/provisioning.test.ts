@@ -132,6 +132,45 @@ describe("provisionDnsConfRepository", () => {
     expect(syncCallIndex).toBeLessThan(secretsCallIndex);
   });
 
+  it("uses the upstream repository directly when the authenticated user owns it", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "noVibe" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "noVibe" }, name: "DnsConf", fork: false } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 11, html_url: "https://github.com/noVibe/DnsConf/actions/runs/11" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
+      return { data: {} };
+    });
+
+    const result = await provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`
+    });
+
+    expect(result.repository).toEqual({ owner: "noVibe", repo: "DnsConf" });
+    expect(request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/forks", expect.anything());
+    expect(request).not.toHaveBeenCalledWith("POST /repos/{owner}/{repo}/merge-upstream", expect.anything());
+    expect(request).toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/actions/variables",
+      expect.objectContaining({ owner: "noVibe", repo: "DnsConf", name: "DNS" })
+    );
+  });
+
   it("fails before configuration when an existing fork cannot be synchronized", async () => {
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") {
@@ -449,6 +488,26 @@ describe("loadExistingDnsConfSetup", () => {
     });
   });
 
+  it("loads the upstream repository for its authenticated owner", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "noVibe" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "noVibe" }, name: "DnsConf", fork: false } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/variables") {
+        return { data: { variables: [{ name: "DNS", value: "nextdns" }] } };
+      }
+      return { data: {} };
+    });
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf");
+
+    expect(result?.repository).toEqual({ owner: "noVibe", repo: "DnsConf" });
+    expect(result?.config?.profiles).toEqual([
+      expect.objectContaining({ provider: "nextdns" })
+    ]);
+  });
+
   it("returns null when the user has no fork", async () => {
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") return { data: { login: "alice" } };
@@ -467,6 +526,22 @@ describe("loadExistingDnsConfSetup", () => {
       if (route === "GET /user") return { data: { login: "alice" } };
       if (route === "GET /repos/{owner}/{repo}") {
         return { data: { fork: true, parent: { full_name: "someone-else/DnsConf" } } };
+      }
+      return { data: {} };
+    });
+
+    await expect(loadExistingDnsConfSetup(request, "noVibe", "DnsConf")).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/variables",
+      expect.anything()
+    );
+  });
+
+  it("ignores a same-named non-fork repository owned by another user", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: false } };
       }
       return { data: {} };
     });

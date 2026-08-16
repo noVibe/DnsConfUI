@@ -52,6 +52,12 @@ type PublicKeyResponse = {
   key_id: string;
 };
 
+type ExistingRepository = {
+  owner: string;
+  repo: string;
+  kind: "upstream" | "fork";
+};
+
 const POLL_RETRIES = 12;
 const POLL_INTERVAL_MS = 5000;
 
@@ -135,7 +141,7 @@ export async function loadExistingDnsConfSetup(
   sourceRepo: string
 ): Promise<ExistingDnsConfSetup | null> {
   const user = await getAuthenticatedUser(request);
-  const repository = await findExistingFork(request, user, sourceOwner, sourceRepo);
+  const repository = await findExistingRepository(request, user, sourceOwner, sourceRepo);
   if (!repository) return null;
 
   const response = await request("GET /repos/{owner}/{repo}/actions/variables", {
@@ -154,7 +160,7 @@ export async function loadExistingDnsConfSetup(
   }
 
   return {
-    repository,
+    repository: { owner: repository.owner, repo: repository.repo },
     variables,
     config: configFromDnsConfVariables(variables)
   };
@@ -166,17 +172,25 @@ async function getAuthenticatedUser(request: GitHubRequest): Promise<string> {
   return data.login;
 }
 
-async function findExistingFork(
+async function findExistingRepository(
   request: GitHubRequest,
   user: string,
   sourceOwner: string,
   repo: string
-): Promise<{ owner: string; repo: string } | null> {
+): Promise<ExistingRepository | null> {
   try {
     const response = await request("GET /repos/{owner}/{repo}", { owner: user, repo });
     const data = response.data as RepoResponse;
-    if (data.fork && data.parent?.full_name?.toLowerCase() === `${sourceOwner}/${repo}`.toLowerCase()) {
-      return { owner: user, repo };
+    const expectedFullName = `${sourceOwner}/${repo}`.toLowerCase();
+    const isUpstream = !data.fork
+      && user.toLowerCase() === sourceOwner.toLowerCase()
+      && data.owner?.login?.toLowerCase() === sourceOwner.toLowerCase()
+      && data.name?.toLowerCase() === repo.toLowerCase();
+    const isFork = Boolean(data.fork)
+      && data.parent?.full_name?.toLowerCase() === expectedFullName;
+
+    if (isUpstream || isFork) {
+      return { owner: user, repo, kind: isUpstream ? "upstream" : "fork" };
     }
   } catch (error) {
     if (!isNotFoundError(error)) throw error;
@@ -190,14 +204,16 @@ async function ensureFork(
   sourceRepo: string,
   user: string
 ): Promise<{ owner: string; repo: string }> {
-  const existing = await findExistingFork(request, user, sourceOwner, sourceRepo);
+  const existing = await findExistingRepository(request, user, sourceOwner, sourceRepo);
   if (existing) {
-    await request("POST /repos/{owner}/{repo}/merge-upstream", {
-      owner: existing.owner,
-      repo: existing.repo,
-      branch: "main"
-    });
-    return existing;
+    if (existing.kind === "fork") {
+      await request("POST /repos/{owner}/{repo}/merge-upstream", {
+        owner: existing.owner,
+        repo: existing.repo,
+        branch: "main"
+      });
+    }
+    return { owner: existing.owner, repo: existing.repo };
   }
 
   try {
@@ -207,9 +223,9 @@ async function ensureFork(
     });
   } catch (error) {
     if (isAlreadyExistsError(error)) {
-      const found = await findExistingFork(request, user, sourceOwner, sourceRepo);
+      const found = await findExistingRepository(request, user, sourceOwner, sourceRepo);
       if (found) {
-        return found;
+        return { owner: found.owner, repo: found.repo };
       }
     }
     throw error;
