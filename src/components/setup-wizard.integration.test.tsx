@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
-import { GEOHIDE_HOSTS_LIST } from "@/domain/toggles";
+import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST } from "@/domain/toggles";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { SetupWizard } from "./setup-wizard";
 
@@ -67,5 +67,54 @@ describe("SetupWizard retained navigation", () => {
       name: "Обратно к настройке без учётных данных"
     })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue(DEFAULT_DNS_DONOR);
+  });
+
+  it("preserves every geo-blocking source after disabling and re-enabling the feature", async () => {
+    const customRedirect = "https://custom.test/redirect-hosts.txt";
+    mocks.loadExistingDnsConfSetup.mockResolvedValueOnce({
+      repository: { owner: "alice", repo: "DnsConf" },
+      variables: {
+        DNS: "nextdns",
+        DONOR_DNS: DEFAULT_DNS_DONOR,
+        REDIRECT: [GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, customRedirect].join(",")
+      },
+      config: {
+        profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
+        blocklists: [],
+        redirects: [GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, customRedirect],
+        redirectExclusions: []
+      },
+      variableEnvironment: "dns"
+    });
+
+    render(
+      <LocaleProvider>
+        <SetupWizard />
+      </LocaleProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Сохранить учётные данные/ }));
+
+    const geoBlock = screen.getByRole("checkbox", { name: "Обход гео-блокировок" });
+    const geoHide = screen.getByRole("checkbox", { name: "GeoHide" });
+    const malw = screen.getByRole("checkbox", { name: "Malw" });
+    const customSource = screen.getByRole("textbox", { name: "Другой источник перенаправлений 1" });
+
+    expect(geoBlock).toBeChecked();
+    expect(geoHide).toBeChecked();
+    expect(malw).toBeChecked();
+    expect(customSource).toHaveValue(customRedirect);
+
+    fireEvent.click(geoBlock);
+    expect(geoBlock).not.toBeChecked();
+    expect(geoHide).toBeChecked();
+    expect(malw).toBeChecked();
+    expect(customSource).toHaveValue(customRedirect);
+
+    fireEvent.click(geoBlock);
+    expect(geoBlock).toBeChecked();
+    expect(geoHide).toBeChecked();
+    expect(malw).toBeChecked();
+    expect(customSource).toHaveValue(customRedirect);
   });
 });
