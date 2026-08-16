@@ -179,7 +179,7 @@ export const locale: Record<LocaleKey, string> = {
   "auth.clickToCopy": "Нажмите, чтобы скопировать",
   "auth.openGhVerification": "Открыть страницу подтверждения GitHub",
   "auth.codeCopied": "Код скопирован — нажмите кнопку выше, чтобы открыть GitHub и вставить его",
-  "auth.permissions": "Вы предоставите права repo, workflow и read:user, чтобы браузер мог создать форк DnsConf и настроить Actions.",
+  "auth.permissions": "Вы предоставите права repo, workflow и read:user, чтобы браузер мог начать взаимодействие с GitHub.",
   "auth.start": "Начать подключение к GitHub",
   "auth.restart": "Перезапустить авторизацию",
 

@@ -177,7 +177,7 @@ export const locale = {
   "auth.clickToCopy": "Click to copy",
   "auth.openGhVerification": "Open GitHub verification",
   "auth.codeCopied": "Code copied \u2014 click the button above to open GitHub and paste it",
-  "auth.permissions": "You will grant repo, workflow, and read:user permissions so the browser can create your DnsConf fork and configure Actions.",
+  "auth.permissions": "You will grant repo, workflow, and read:user permissions so the browser can start interacting with GitHub.",
   "auth.start": "Start GitHub connection",
   "auth.restart": "Restart authorization",
 
