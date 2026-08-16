@@ -48,7 +48,9 @@ describe("SetupWizard retained navigation", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Сохранить учётные данные/ }));
     const setupTitle = screen.getByRole("heading", { name: "Настройка конфигурации" });
-    expect(setupTitle.parentElement).toContainElement(screen.getByRole("button", { name: "Быстрая" }));
+    const quickModeButton = screen.getByRole("button", { name: "Быстрая" });
+    expect(setupTitle.parentElement).toContainElement(quickModeButton);
+    expect(quickModeButton.parentElement).toHaveClass("ml-auto");
     expect(setupTitle.parentElement?.parentElement).toHaveClass(
       "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
     );

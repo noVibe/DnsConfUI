@@ -6,7 +6,7 @@ import { useLocale } from "@/lib/i18n/context";
 export function ModeTabs({ mode, setMode }: { mode: "quick" | "expert"; setMode: (m: "quick" | "expert") => void }) {
   const { t } = useLocale();
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
+    <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-paper p-1">
       <button
         type="button"
         onClick={() => setMode("quick")}
