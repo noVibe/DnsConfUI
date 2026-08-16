@@ -1,5 +1,5 @@
 import type { DnsConfConfig } from "./dnsconf-config";
-import { DEFAULT_DNS_DONOR, DISABLED_DNS_DONOR } from "./dns-donors";
+import { DISABLED_DNS_DONOR } from "./dns-donors";
 
 export const DNSCONF_VARIABLE_NAMES = [
   "DNS",
@@ -36,7 +36,7 @@ export function configFromDnsConfVariables(variables: DnsConfVariables): DnsConf
 
 function donorForProfile(value: string | undefined): string {
   if (value === DISABLED_DNS_DONOR) return "";
-  return value || DEFAULT_DNS_DONOR;
+  return value || "";
 }
 
 function splitCommaValues(value: string | undefined, preserveEmpty = false): string[] {

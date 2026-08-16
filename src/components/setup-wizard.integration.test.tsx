@@ -117,4 +117,29 @@ describe("SetupWizard retained navigation", () => {
     expect(malw).toBeChecked();
     expect(customSource).toHaveValue(customRedirect);
   });
+
+  it("shows the DNS donor as disabled when DONOR_DNS is absent", async () => {
+    mocks.loadExistingDnsConfSetup.mockResolvedValueOnce({
+      repository: { owner: "alice", repo: "DnsConf" },
+      variables: { DNS: "nextdns" },
+      config: {
+        profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: "" }],
+        blocklists: [],
+        redirects: [],
+        redirectExclusions: []
+      },
+      variableEnvironment: "dns"
+    });
+
+    render(
+      <LocaleProvider>
+        <SetupWizard />
+      </LocaleProvider>
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /Сохранить учётные данные/ }));
+
+    expect(screen.getByRole("checkbox", { name: "DNS-донор" })).not.toBeChecked();
+    expect(screen.queryByRole("combobox", { name: "DNS-донор" })).not.toBeInTheDocument();
+  });
 });

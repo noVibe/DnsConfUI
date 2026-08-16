@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DNS_DONOR } from "./dns-donors";
 import { configFromDnsConfVariables } from "./existing-dnsconf-config";
 
 describe("configFromDnsConfVariables", () => {
@@ -21,12 +20,21 @@ describe("configFromDnsConfVariables", () => {
     });
   });
 
-  it("uses the default donor for profiles missing a positional donor value", () => {
+  it("disables donors when DONOR_DNS is absent", () => {
     const config = configFromDnsConfVariables({ DNS: "cloudflare,nextdns" });
 
+    expect(config?.profiles.map((profile) => profile.donorDns)).toEqual(["", ""]);
+  });
+
+  it("disables profiles missing a positional donor value", () => {
+    const config = configFromDnsConfVariables({
+      DNS: "cloudflare,nextdns",
+      DONOR_DNS: "https://xbox-dns.ru/dns-query"
+    });
+
     expect(config?.profiles.map((profile) => profile.donorDns)).toEqual([
-      DEFAULT_DNS_DONOR,
-      DEFAULT_DNS_DONOR
+      "https://xbox-dns.ru/dns-query",
+      ""
     ]);
   });
 
