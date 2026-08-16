@@ -29,13 +29,13 @@ describe("ProvisionPanel", () => {
     renderPanel({ retainCredentials: true });
 
     expect(screen.getByText("Применить изменения")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Обновить" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Обновить конфигурацию" })).toBeVisible();
   });
 
   it("uses update progress copy when retained configuration is running", () => {
     renderPanel({ retainCredentials: true, status: "running" });
 
-    expect(screen.getByRole("button", { name: "Обновление…" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Обновление конфигурации…" })).toBeVisible();
   });
 
   it("keeps apply copy for a full configuration", () => {
