@@ -130,9 +130,11 @@ export const locale = {
   "review.credentialsRetained": "Credentials: retained in GitHub Secrets",
 
   "provision.desc": "Apply DNS provider settings via API and provision your DnsConf fork on GitHub.",
-  "provision.retainDesc": "Update repository variables and run DnsConf without changing saved CLIENT_ID or AUTH_SECRET.",
+  "provision.retainDesc": "Apply changes",
   "provision.apply": "Apply configuration",
   "provision.applying": "Applying\u2026",
+  "provision.retainApply": "Update",
+  "provision.retainApplying": "Updating\u2026",
   "provision.configured": "Repository configured",
   "provision.openRun": "Open workflow run",
   "provision.star": "Give a Star!",

@@ -70,7 +70,9 @@ export function ProvisionPanel({
         ) : (
           <Play className="size-4" aria-hidden="true" />
         )}
-        {status === "running" ? t('provision.applying') : t('provision.apply')}
+        {status === "running"
+          ? t(retainCredentials ? 'provision.retainApplying' : 'provision.applying')
+          : t(retainCredentials ? 'provision.retainApply' : 'provision.apply')}
       </Button>
 
       {status === "done" && result ? (

@@ -132,9 +132,11 @@ export const locale: Record<LocaleKey, string> = {
   "review.credentialsRetained": "Учётные данные: сохранены в GitHub Secrets",
 
   "provision.desc": "Применить настройки DNS-провайдера через API и настроить форк DnsConf на GitHub.",
-  "provision.retainDesc": "Обновить переменные репозитория и запустить DnsConf, не изменяя сохранённые CLIENT_ID и AUTH_SECRET.",
+  "provision.retainDesc": "Применить изменения",
   "provision.apply": "Применить конфигурацию",
   "provision.applying": "Применение\u2026",
+  "provision.retainApply": "Обновить",
+  "provision.retainApplying": "Обновление\u2026",
   "provision.configured": "Репозиторий настроен",
   "provision.openRun": "Открыть запуск workflow",
   "provision.star": "Поставить звезду!",
