@@ -40,7 +40,16 @@ export function ProfilesSection({
   const [credStatus, setCredStatus] = useState<Record<number, { status: "idle" | "validating" | "valid" | "invalid"; message?: string }>>({});
   const validateTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
   const validationVersions = useRef<Record<number, number>>({});
+  const enabledDonors = useRef<Record<number, string>>(
+    Object.fromEntries(profiles.flatMap((profile, index) => profile.donorDns ? [[index, profile.donorDns]] : [])),
+  );
   useEffect(() => () => { Object.values(validateTimers.current).forEach(clearTimeout); }, []);
+
+  useEffect(() => {
+    profiles.forEach((profile, index) => {
+      if (profile.donorDns) enabledDonors.current[index] = profile.donorDns;
+    });
+  }, [profiles]);
 
   useEffect(() => {
     const p = profiles[selected];
@@ -118,6 +127,16 @@ export function ProfilesSection({
   function add() {
     setValue("profiles", [...profiles, { clientId: "", authSecret: "", provider: "", donorDns: DEFAULT_DNS_DONOR }] as DnsConfConfig["profiles"], { shouldDirty: true, shouldValidate: true });
     setSelected(profiles.length);
+  }
+
+  function toggleDonor(index: number, checked: boolean) {
+    if (!checked) {
+      if (profiles[index].donorDns) enabledDonors.current[index] = profiles[index].donorDns;
+      update(index, "donorDns", "");
+      return;
+    }
+
+    update(index, "donorDns", enabledDonors.current[index] ?? DEFAULT_DNS_DONOR);
   }
 
   return (
@@ -223,7 +242,7 @@ export function ProfilesSection({
           {simplified ? (
             <ToggleSwitch
               checked={Boolean(profiles[selected].donorDns)}
-              onChange={(checked) => update(selected, "donorDns", checked ? DEFAULT_DNS_DONOR : "")}
+              onChange={(checked) => toggleDonor(selected, checked)}
               label={t('profiles.donor')}
               tooltip={t('profiles.donorTooltip')}
               labelNowrap

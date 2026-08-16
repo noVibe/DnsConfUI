@@ -49,6 +49,22 @@ function ControlledValidationSection() {
   );
 }
 
+function ControlledDonorSection({ donorDns }: { donorDns: string }) {
+  const [profiles, setProfiles] = useState([{ clientId: "", authSecret: "", provider: "nextdns" as const, donorDns }]);
+  const setValue = (_name: "profiles", value: typeof profiles) => setProfiles(value);
+
+  return (
+    <LocaleProvider>
+      <ProfilesSection
+        profiles={profiles}
+        setValue={setValue as React.ComponentProps<typeof ProfilesSection>["setValue"]}
+        simplified
+        retainCredentials
+      />
+    </LocaleProvider>
+  );
+}
+
 describe("ProfilesSection", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -161,6 +177,19 @@ describe("ProfilesSection", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "3" } });
     expect(screen.getByRole("checkbox", { name: "DNS-донор" })).not.toBeChecked();
     expect(screen.queryByRole("combobox", { name: "DNS-донор" })).not.toBeInTheDocument();
+  });
+
+  it("restores a custom donor after disabling and enabling it in retained setup", () => {
+    const customDonor = "https://custom.test/dns-query";
+    render(<ControlledDonorSection donorDns={customDonor} />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "DNS-донор" }));
+    expect(screen.queryByRole("combobox", { name: "DNS-донор" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "DNS-донор" }));
+    expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue(customDonor);
+    expect(screen.getByRole("combobox", { name: "DNS-донор" }))
+      .toHaveDisplayValue(`Свой адрес: ${customDonor}`);
   });
 
   it("validates complete credentials after the debounce delay", async () => {
