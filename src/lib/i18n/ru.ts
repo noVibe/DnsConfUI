@@ -114,9 +114,6 @@ export const locale: Record<LocaleKey, string> = {
   "review.none": "Нет",
 
   "provision.desc": "Применить настройки DNS-провайдера через API и настроить форк DnsConf на GitHub.",
-  "provision.sync": "Синхронизировать",
-  "provision.syncing": "Синхронизация\u2026",
-  "provision.synced": "Синхронизировано!",
   "provision.apply": "Применить конфигурацию",
   "provision.applying": "Применение\u2026",
   "provision.configured": "Репозиторий настроен",

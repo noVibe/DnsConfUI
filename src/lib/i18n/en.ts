@@ -112,9 +112,6 @@ export const locale = {
   "review.none": "None",
 
   "provision.desc": "Apply DNS provider settings via API and provision your DnsConf fork on GitHub.",
-  "provision.sync": "Sync fork",
-  "provision.syncing": "Syncing\u2026",
-  "provision.synced": "Synced!",
   "provision.apply": "Apply configuration",
   "provision.applying": "Applying\u2026",
   "provision.configured": "Repository configured",
