@@ -1,12 +1,17 @@
 import { z } from "zod";
 import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
+import { DEFAULT_DNS_DONOR, DISABLED_DNS_DONOR } from "./dns-donors";
 
 const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
 
-const profileSchema = z.object({
+export const profileSchema = z.object({
   clientId: z.string().trim().min(1, "validation.clientIdRequired"),
   authSecret: z.string().trim().min(1, "validation.authSecretRequired"),
-  provider: dnsProviderSchema.or(z.literal(""))
+  provider: dnsProviderSchema.or(z.literal("")),
+  donorDns: z.string().trim().refine(
+    (value) => value === "" || isValidDonorDns(value),
+    "profiles.donorInvalid"
+  )
 });
 
 export const dnsConfConfigSchema = z
@@ -37,11 +42,11 @@ export type Profile = z.infer<typeof profileSchema>;
 
 export type DnsConfPayload = {
   secrets: Record<"CLIENT_ID" | "AUTH_SECRET", string>;
-  variables: Record<"DNS" | "BLOCK" | "REDIRECT" | "EXCLUDE_REDIRECT", string>;
+  variables: Record<"DNS" | "BLOCK" | "REDIRECT" | "EXCLUDE_REDIRECT" | "DONOR_DNS", string>;
 };
 
 export const defaultDnsConfConfig: DnsConfConfig = {
-  profiles: [{ clientId: "", authSecret: "", provider: "" }],
+  profiles: [{ clientId: "", authSecret: "", provider: "", donorDns: DEFAULT_DNS_DONOR }],
   blocklists: [],
   redirects: [],
   redirectExclusions: []
@@ -57,11 +62,32 @@ export function buildDnsConfPayload(config: DnsConfConfig): DnsConfPayload {
     },
     variables: {
       DNS: parsed.profiles.map(p => p.provider || "cloudflare").join(","),
+      DONOR_DNS: parsed.profiles.map(p => p.donorDns || DISABLED_DNS_DONOR).join(","),
       BLOCK: parsed.blocklists.join(","),
       REDIRECT: parsed.redirects.join(","),
       EXCLUDE_REDIRECT: parsed.redirectExclusions.join(",")
     }
   };
+}
+
+function isValidDonorDns(value: string): boolean {
+  if (isValidIpv4(value)) return true;
+
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isValidIpv4(value: string): boolean {
+  const parts = value.split(".");
+  return parts.length === 4 && parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    const number = Number(part);
+    return number >= 0 && number <= 255 && String(number) === part;
+  });
 }
 
 export function getWizardStepValidity(step: number, config: Partial<DnsConfConfig>): boolean {

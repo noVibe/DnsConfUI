@@ -6,7 +6,7 @@ Configure DNS blocklists and redirects for Cloudflare / NextDNS — without touc
 ## What it does
 
 1. **Authenticate** via GitHub Device Flow — no password, no token storage
-2. **Configure** DNS provider credentials and source URLs (BLOCK / REDIRECT lists)
+2. **Configure** DNS provider credentials, DNS donors, and source URLs (BLOCK / REDIRECT lists)
 3. **Provision** — forks the DnsConf repo, uploads encrypted secrets to GitHub Actions,
    creates workflow variables, and dispatches the first run
 
@@ -26,7 +26,13 @@ The application has no backend, no database, and never sees your provider secret
 ## Multi-profile support
 
 Configure several DNS profiles in one go. Each profile has its own CLIENT_ID, AUTH_SECRET,
-and DNS provider — useful when managing multiple Cloudflare / NextDNS accounts.
+DNS provider, and optional DNS donor — useful when managing multiple Cloudflare / NextDNS accounts.
+
+## DNS donor
+
+Quick mode enables GeoHide by default and also offers Xbox and Comss presets. Expert mode accepts
+an IPv4 address or a DNS-over-HTTPS URL. Donors are stored in the `DONOR_DNS` GitHub Actions variable
+in profile order; disabled profiles use `-` to preserve positional mapping.
 
 ## Quick start
 

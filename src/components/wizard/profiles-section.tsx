@@ -4,18 +4,22 @@ import { CheckCircle2, ChevronDown, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { UseFormSetValue } from "react-hook-form";
 import type { DnsConfConfig } from "@/domain/dnsconf-config";
+import { DEFAULT_DNS_DONOR, DNS_DONORS, isDnsDonorPreset } from "@/domain/dns-donors";
 import { validateCredentials } from "@/lib/nextdns/api";
 import { useLocale } from "@/lib/i18n/context";
 import { Field, inputClass } from "@/components/ui";
 import { CLOUDFLARE_CLIENT_ID_LENGTH, NEXTDNS_CLIENT_ID_LENGTH } from "@/lib/constants";
 import { translatedError } from "./utils";
 import { ScriptBehaviour } from "./script-behaviour";
+import { ToggleSwitch } from "./toggle-switch";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export function ProfilesSection({
   profiles,
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
+  profileDonorErrors,
   mixedProviderIndices,
   simplified,
   onValidChange
@@ -24,6 +28,7 @@ export function ProfilesSection({
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  profileDonorErrors?: Array<{ index: number; message: string }>;
   mixedProviderIndices?: Set<number>;
   simplified?: boolean;
   onValidChange?: (v: boolean) => void;
@@ -60,7 +65,7 @@ export function ProfilesSection({
     onValidChange(allValid);
   }, [credStatus, profiles, onValidChange]);
 
-  function update(index: number, field: "clientId" | "authSecret" | "provider", value: string) {
+  function update(index: number, field: "clientId" | "authSecret" | "provider" | "donorDns", value: string) {
     const next = profiles.map((p, i) =>
       i === index ? { ...p, [field]: value } : p
     ) as DnsConfConfig["profiles"];
@@ -90,14 +95,14 @@ export function ProfilesSection({
 
   function remove(index: number) {
     const next = profiles.filter((_, i) => i !== index);
-    setValue("profiles", next.length ? (next as DnsConfConfig["profiles"]) : [{ clientId: "", authSecret: "", provider: "" }], { shouldDirty: true, shouldValidate: true });
+    setValue("profiles", next.length ? (next as DnsConfConfig["profiles"]) : [{ clientId: "", authSecret: "", provider: "", donorDns: DEFAULT_DNS_DONOR }], { shouldDirty: true, shouldValidate: true });
     if (selected >= next.length) {
       setSelected(Math.max(0, next.length - 1));
     }
   }
 
   function add() {
-    setValue("profiles", [...profiles, { clientId: "", authSecret: "", provider: "" }] as DnsConfConfig["profiles"], { shouldDirty: true, shouldValidate: true });
+    setValue("profiles", [...profiles, { clientId: "", authSecret: "", provider: "", donorDns: DEFAULT_DNS_DONOR }] as DnsConfConfig["profiles"], { shouldDirty: true, shouldValidate: true });
     setSelected(profiles.length);
   }
 
@@ -183,6 +188,48 @@ export function ProfilesSection({
               {t('wizard.mixedProvider')}
             </div>
           ) : null}
+          {simplified ? (
+            <ToggleSwitch
+              checked={Boolean(profiles[selected].donorDns)}
+              onChange={(checked) => update(selected, "donorDns", checked ? DEFAULT_DNS_DONOR : "")}
+              label={t('profiles.donor')}
+              tooltip={t('profiles.donorTooltip')}
+            >
+              {profiles[selected].donorDns ? (
+                <select
+                  className="h-5 rounded-md border border-line bg-white px-2 text-xs text-ink outline-none focus:border-steel focus:ring-2 focus:ring-steel/20"
+                  value={profiles[selected].donorDns}
+                  onChange={(e) => update(selected, "donorDns", e.target.value)}
+                  aria-label={t('profiles.donor')}
+                >
+                  {!isDnsDonorPreset(profiles[selected].donorDns) ? (
+                    <option value={profiles[selected].donorDns}>{t('profiles.donorCustom')}</option>
+                  ) : null}
+                  {DNS_DONORS.map((donor) => (
+                    <option key={donor.value} value={donor.value}>{donor.label}</option>
+                  ))}
+                </select>
+              ) : null}
+            </ToggleSwitch>
+          ) : (
+            <Field
+              label={(
+                <span className="inline-flex items-center gap-1.5">
+                  DONOR_DNS
+                  <Tooltip text={t('profiles.donorTooltip')} />
+                </span>
+              )}
+              error={profileDonorErrors?.find(e => e.index === selected) ? t('profiles.donorInvalid') : undefined}
+            >
+              <input
+                className={inputClass}
+                autoComplete="off"
+                value={profiles[selected].donorDns}
+                onChange={(e) => update(selected, "donorDns", e.target.value)}
+                placeholder={t('profiles.donorPlaceholder')}
+              />
+            </Field>
+          )}
         </div>
       ) : null}
       {!simplified ? (

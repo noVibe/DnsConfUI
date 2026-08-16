@@ -19,6 +19,7 @@ export function QuickModeUI({
   setValue,
   profileClientIdErrors,
   profileSecretErrors,
+  profileDonorErrors,
   mixedProviderIndices,
   geoBlock,
   geoHideChecked,
@@ -55,6 +56,7 @@ export function QuickModeUI({
   setValue: UseFormSetValue<DnsConfConfig>;
   profileClientIdErrors?: Array<{ index: number; message: string }>;
   profileSecretErrors?: Array<{ index: number; message: string }>;
+  profileDonorErrors?: Array<{ index: number; message: string }>;
   mixedProviderIndices: Set<number>;
   geoBlock: boolean;
   geoHideChecked: boolean;
@@ -96,6 +98,7 @@ export function QuickModeUI({
             setValue={setValue}
             profileClientIdErrors={profileClientIdErrors}
             profileSecretErrors={profileSecretErrors}
+            profileDonorErrors={profileDonorErrors}
             mixedProviderIndices={mixedProviderIndices}
             simplified
             onValidChange={onProfilesValidChange}
