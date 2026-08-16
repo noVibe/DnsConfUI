@@ -87,4 +87,20 @@ describe("buildQuickDnsConfConfig", () => {
 
     expect(config.blocklists).toEqual([OISD_SMALL_BLOCK_DOMAINS]);
   });
+
+  it("removes every redirect source when geo-blocking is disabled", () => {
+    const config = buildQuickDnsConfConfig({
+      profiles: [{ clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }],
+      existingBlocklists: [],
+      existingRedirects: ["https://custom.test/redirect", GEOHIDE_HOSTS_LIST],
+      existingRedirectExclusions: [],
+      geoBlock: false,
+      geoHideChecked: true,
+      malwChecked: false,
+      blockAds: false,
+      retainCredentials: true
+    });
+
+    expect(config.redirects).toEqual([]);
+  });
 });

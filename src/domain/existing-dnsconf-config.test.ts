@@ -30,6 +30,26 @@ describe("configFromDnsConfVariables", () => {
     ]);
   });
 
+  it("restores source variables separated by whitespace or commas", () => {
+    const config = configFromDnsConfVariables({
+      DNS: "cloudflare",
+      BLOCK: "https://example.com/block-a\nhttps://example.com/block-b https://example.com/block-c",
+      REDIRECT: "https://example.com/redirect-a,\nhttps://example.com/redirect-b",
+      EXCLUDE_REDIRECT: "keep.example another.example"
+    });
+
+    expect(config?.blocklists).toEqual([
+      "https://example.com/block-a",
+      "https://example.com/block-b",
+      "https://example.com/block-c"
+    ]);
+    expect(config?.redirects).toEqual([
+      "https://example.com/redirect-a",
+      "https://example.com/redirect-b"
+    ]);
+    expect(config?.redirectExclusions).toEqual(["keep.example", "another.example"]);
+  });
+
   it("rejects missing or unsupported DNS provider values", () => {
     expect(configFromDnsConfVariables({})).toBeNull();
     expect(configFromDnsConfVariables({ DNS: "cloudflare,unknown" })).toBeNull();

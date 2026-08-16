@@ -23,6 +23,7 @@ export function QuickModeUI({
   geoBlock,
   geoHideChecked,
   malwChecked,
+  customRedirects = [],
   blockAds,
   disguisedTrackers,
   nativeTracking,
@@ -56,6 +57,7 @@ export function QuickModeUI({
   geoBlock: boolean;
   geoHideChecked: boolean;
   malwChecked: boolean;
+  customRedirects?: string[];
   blockAds: boolean;
   disguisedTrackers: boolean;
   nativeTracking: boolean;
@@ -128,6 +130,22 @@ export function QuickModeUI({
                 </label>
               </div>
             </ToggleSwitch>
+
+            {retainCredentials && customRedirects.length > 0 ? (
+              <div className={`space-y-1.5 rounded-lg border border-line/70 bg-white/50 px-3 py-2 ${geoBlock ? "" : "opacity-50"}`}>
+                <p className="text-xs font-medium text-ink/60">{t('quick.customRedirects')}</p>
+                {customRedirects.map((url, index) => (
+                  <input
+                    key={`${url}-${index}`}
+                    type="url"
+                    readOnly
+                    value={url}
+                    aria-label={t('quick.customRedirect', { n: index + 1 })}
+                    className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink/70 outline-none"
+                  />
+                ))}
+              </div>
+            ) : null}
 
             <ToggleSwitch
               checked={blockAds}

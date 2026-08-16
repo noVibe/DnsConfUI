@@ -141,6 +141,8 @@ export const locale = {
   "quick.features": "Features",
   "quick.bypass": "Bypass geo-blocking",
   "quick.bypassTooltip": "Bypasses DNS-based geo-restrictions using curated hosts filters.",
+  "quick.customRedirects": "Other redirect sources",
+  "quick.customRedirect": "Other redirect source {n}",
   "quick.geohide": "GeoHide",
   "quick.malw": "Malw",
   "quick.blockAds": "Block ads & trackers",

@@ -78,4 +78,17 @@ describe("QuickModeUI", () => {
     expect(screen.getByRole("checkbox", { name: "Обход гео-блокировок" })).toBeEnabled();
     expect(screen.getAllByRole("note", { name: /нельзя прочитать или изменить без прямого доступа к API NextDNS/ })).toHaveLength(3);
   });
+
+  it("shows unrecognized redirect URLs in retained mode even when geo-blocking is disabled", () => {
+    renderQuickMode({
+      retainCredentials: true,
+      profiles: [{ clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }],
+      customRedirects: ["https://custom.test/one", "https://custom.test/two"]
+    });
+
+    expect(screen.getByRole("textbox", { name: "Другой источник перенаправлений 1" }))
+      .toHaveValue("https://custom.test/one");
+    expect(screen.getByRole("textbox", { name: "Другой источник перенаправлений 2" }))
+      .toHaveValue("https://custom.test/two");
+  });
 });

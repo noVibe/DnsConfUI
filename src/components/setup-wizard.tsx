@@ -53,24 +53,29 @@ export function SetupWizard() {
   const [setupCheckError, setSetupCheckError] = useState("");
   const [setupCheckVersion, setSetupCheckVersion] = useState(0);
   const retainCredentials = setupPath === "retained";
+  const retainedCustomRedirects = retainCredentials
+    ? existingSetup?.config?.redirects.filter(
+      (url) => url !== GEOHIDE_HOSTS_LIST && url !== MALW_HOSTS_LIST
+    ) ?? []
+    : [];
 
   const handleGeoHideChange = useCallback((checked: boolean) => {
     setGeoHideChecked(checked);
-    if (!checked && !malwChecked) {
+    if (!checked && !malwChecked && retainedCustomRedirects.length === 0) {
       setGeoBlock(false);
     } else if (checked && !geoBlock) {
       setGeoBlock(true);
     }
-  }, [geoBlock, malwChecked]);
+  }, [geoBlock, malwChecked, retainedCustomRedirects.length]);
 
   const handleMalwChange = useCallback((checked: boolean) => {
     setMalwChecked(checked);
-    if (!checked && !geoHideChecked) {
+    if (!checked && !geoHideChecked && retainedCustomRedirects.length === 0) {
       setGeoBlock(false);
     } else if (checked && !geoBlock) {
       setGeoBlock(true);
     }
-  }, [geoBlock, geoHideChecked]);
+  }, [geoBlock, geoHideChecked, retainedCustomRedirects.length]);
 
   const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
   const [allProfilesValid, setAllProfilesValid] = useState(false);
@@ -135,7 +140,7 @@ export function SetupWizard() {
     setMode("quick");
     setGeoHideChecked(hasGeoHide);
     setMalwChecked(hasMalw);
-    setGeoBlock(hasGeoHide || hasMalw);
+    setGeoBlock(config.redirects.length > 0);
     setBlockAds(!hasNextDns && hasCloudflareBlocklist);
     setDisguisedTrackers(false);
     setNativeTracking(false);
@@ -462,6 +467,7 @@ export function SetupWizard() {
             geoBlock={geoBlock}
             geoHideChecked={geoHideChecked}
             malwChecked={malwChecked}
+            customRedirects={retainedCustomRedirects}
             blockAds={blockAds}
             disguisedTrackers={disguisedTrackers}
             nativeTracking={nativeTracking}
@@ -517,7 +523,7 @@ export function buildQuickDnsConfConfig({
   const blocklists = retainCredentials
     ? existingBlocklists.filter((url) => !canEditBlockAds || !cloudflareBlocklists.includes(url))
     : [];
-  const redirects = retainCredentials
+  const redirects = retainCredentials && geoBlock
     ? existingRedirects.filter((url) => url !== GEOHIDE_HOSTS_LIST && url !== MALW_HOSTS_LIST)
     : [];
 

@@ -143,6 +143,8 @@ export const locale: Record<LocaleKey, string> = {
   "quick.features": "Функции",
   "quick.bypass": "Обход гео-блокировок",
   "quick.bypassTooltip": "Обходит географические DNS-ограничения с помощью подготовленных hosts-фильтров.",
+  "quick.customRedirects": "Другие источники перенаправлений",
+  "quick.customRedirect": "Другой источник перенаправлений {n}",
   "quick.geohide": "GeoHide",
   "quick.malw": "Malw",
   "quick.blockAds": "Блокировка рекламы и трекеров",
