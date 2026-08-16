@@ -289,6 +289,7 @@ export function SetupWizard() {
         request: createGitHubRequest(token),
         profileCount: config.profiles.length,
         retainCredentials,
+        variableEnvironment: existingSetup?.variableEnvironment,
         onStep: async (step) => {
           if (step === "fork") {
             setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
@@ -361,7 +362,8 @@ export function SetupWizard() {
         payload: buildDnsConfPayload(parsedConfig.data as DnsConfConfig, { retainCredentials }),
         request: createGitHubRequest(token),
         profileCount: parsedConfig.data.profiles.length,
-        retainCredentials
+        retainCredentials,
+        variableEnvironment: existingSetup?.variableEnvironment
       });
       setResult(provisionResult);
       setStatus("done");

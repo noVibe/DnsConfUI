@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { GEOHIDE_HOSTS_LIST } from "@/domain/toggles";
 import { loadExistingDnsConfSetup, provisionDnsConfRepository, starRepository } from "./provisioning";
 
 describe("provisionDnsConfRepository", () => {
@@ -413,9 +414,15 @@ describe("provisionDnsConfRepository", () => {
   });
 
   it("retains existing GitHub secrets while updating variables", async () => {
-    const request = vi.fn(async (route: string) => {
+    const request = vi.fn(async (route: string, parameters?: Record<string, unknown>) => {
       if (route === "GET /user") return { data: { login: "alice" } };
       if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      if (
+        route === "POST /repos/{owner}/{repo}/environments/{environment_name}/variables" &&
+        parameters?.name === "DNS"
+      ) {
+        throw Object.assign(new Error("Variable already exists"), { status: 409 });
+      }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
         return { data: { workflow_runs: [{ id: 7, html_url: "https://example.test/run/7" }] } };
       }
@@ -436,7 +443,8 @@ describe("provisionDnsConfRepository", () => {
       },
       request,
       encryptSecret,
-      retainCredentials: true
+      retainCredentials: true,
+      variableEnvironment: "dns"
     });
 
     expect(request).not.toHaveBeenCalledWith(
@@ -449,8 +457,12 @@ describe("provisionDnsConfRepository", () => {
     );
     expect(encryptSecret).not.toHaveBeenCalled();
     expect(request).toHaveBeenCalledWith(
-      "POST /repos/{owner}/{repo}/actions/variables",
-      expect.objectContaining({ name: "DONOR_DNS", value: "-" })
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ environment_name: "dns", name: "DONOR_DNS", value: "-" })
+    );
+    expect(request).toHaveBeenCalledWith(
+      "PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
+      expect.objectContaining({ environment_name: "dns", name: "DNS", value: "nextdns" })
     );
   });
 });
@@ -506,6 +518,42 @@ describe("loadExistingDnsConfSetup", () => {
     expect(result?.config?.profiles).toEqual([
       expect.objectContaining({ provider: "nextdns" })
     ]);
+  });
+
+  it("loads DNS environment variables with precedence over repository variables", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "noVibe" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "noVibe" }, name: "DnsConf", fork: false } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/variables") {
+        return { data: { variables: [{ name: "DNS", value: "cloudflare" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/environments") {
+        return { data: { environments: [{ name: "dns" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/environments/{environment_name}/variables") {
+        return { data: { variables: [
+          { name: "DNS", value: "NEXTDNS" },
+          { name: "DONOR_DNS", value: "37.230.192.51" },
+          { name: "REDIRECT", value: GEOHIDE_HOSTS_LIST }
+        ] } };
+      }
+      return { data: {} };
+    });
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf");
+
+    expect(result?.variableEnvironment).toBe("dns");
+    expect(result?.variables).toEqual({
+      DNS: "NEXTDNS",
+      DONOR_DNS: "37.230.192.51",
+      REDIRECT: GEOHIDE_HOSTS_LIST
+    });
+    expect(result?.config).toEqual(expect.objectContaining({
+      profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: "37.230.192.51" }],
+      redirects: [GEOHIDE_HOSTS_LIST]
+    }));
   });
 
   it("returns null when the user has no fork", async () => {
