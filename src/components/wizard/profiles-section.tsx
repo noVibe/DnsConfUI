@@ -197,7 +197,7 @@ export function ProfilesSection({
             >
               {profiles[selected].donorDns ? (
                 <select
-                  className="rounded-md border border-line bg-white px-2 py-1 text-xs text-ink outline-none focus:border-steel focus:ring-2 focus:ring-steel/20"
+                  className="h-5 rounded-md border border-line bg-white px-2 text-xs text-ink outline-none focus:border-steel focus:ring-2 focus:ring-steel/20"
                   value={profiles[selected].donorDns}
                   onChange={(e) => update(selected, "donorDns", e.target.value)}
                   aria-label={t('profiles.donor')}
