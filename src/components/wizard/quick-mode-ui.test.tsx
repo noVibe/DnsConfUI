@@ -63,20 +63,40 @@ describe("QuickModeUI", () => {
     expect(onGeoHideChange).toHaveBeenCalledWith(true);
   });
 
-  it("disables direct NextDNS API settings when GitHub credentials are retained", () => {
+  it("moves unknown NextDNS API settings into a separate unavailable block", () => {
+    const onConfigureFromScratch = vi.fn();
     renderQuickMode({
       retainCredentials: true,
       profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
       blockAds: false,
       disguisedTrackers: false,
-      nativeTracking: false
+      nativeTracking: false,
+      onConfigureFromScratch
     });
 
-    expect(screen.getByRole("checkbox", { name: "Блокировка рекламы и трекеров" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Блокировка скрытых сторонних трекеров" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Защита от встроенного отслеживания" })).toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: "Блокировка рекламы и трекеров" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Блокировка скрытых сторонних трекеров" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Защита от встроенного отслеживания" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Обход гео-блокировок" })).toBeEnabled();
-    expect(screen.getAllByRole("note", { name: /нельзя прочитать или изменить без прямого доступа к API NextDNS/ })).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: "Недоступно без учётных данных" })).toBeVisible();
+    expect(screen.getByText(/Их текущее состояние неизвестно/)).toBeVisible();
+    expect(screen.getByText("Блокировка рекламы и трекеров")).toBeVisible();
+    expect(screen.getByText("Блокировка скрытых сторонних трекеров")).toBeVisible();
+    expect(screen.getByText("Защита от встроенного отслеживания")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Перейти к полной настройке" }));
+    expect(onConfigureFromScratch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps repository-backed Cloudflare blocking editable in retained mode", () => {
+    renderQuickMode({
+      retainCredentials: true,
+      profiles: [{ clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }],
+      blockAds: true
+    });
+
+    expect(screen.getByRole("checkbox", { name: "Блокировка рекламы и трекеров" })).toBeEnabled();
+    expect(screen.queryByRole("heading", { name: "Недоступно без учётных данных" })).not.toBeInTheDocument();
   });
 
   it("shows unrecognized redirect URLs in retained mode even when geo-blocking is disabled", () => {

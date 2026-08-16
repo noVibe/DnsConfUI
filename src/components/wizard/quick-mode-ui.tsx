@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCircle2, Loader2, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, KeyRound, Loader2, X } from "lucide-react";
 import type { UseFormSetValue } from "react-hook-form";
 import type { DnsConfConfig } from "@/domain/dnsconf-config";
 import type { ProvisionResult } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
+import { SecondaryButton } from "@/components/ui";
 import { CredsGuide } from "./creds-guide";
 import { ProfilesSection } from "./profiles-section";
 import { ToggleSwitch } from "./toggle-switch";
@@ -43,7 +44,8 @@ export function QuickModeUI({
   starred,
   starring,
   onStar,
-  retainCredentials = false
+  retainCredentials = false,
+  onConfigureFromScratch
 }: {
   mode: "quick" | "expert";
   setMode: (m: "quick" | "expert") => void;
@@ -78,6 +80,7 @@ export function QuickModeUI({
   starring: boolean;
   onStar: () => Promise<void>;
   retainCredentials?: boolean;
+  onConfigureFromScratch?: () => void;
 }) {
   const { t } = useLocale();
   const hasNextDns = profiles.some((profile) => profile.provider === "nextdns");
@@ -147,40 +150,60 @@ export function QuickModeUI({
               </div>
             ) : null}
 
-            <ToggleSwitch
-              checked={blockAds}
-              onChange={onBlockAdsChange}
-              label={t('quick.blockAds')}
-              tooltip={
-                hasNextDns
-                  ? `${t('quick.blockAdsNdTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`
-                  : t('quick.blockAdsCfTooltip')
-              }
-              disabled={retainCredentials && hasNextDns}
-            />
+            {!retainCredentials || !hasNextDns ? (
+              <ToggleSwitch
+                checked={blockAds}
+                onChange={onBlockAdsChange}
+                label={t('quick.blockAds')}
+                tooltip={hasNextDns ? t('quick.blockAdsNdTooltip') : t('quick.blockAdsCfTooltip')}
+              />
+            ) : null}
 
-            {hasNextDns ? (
+            {hasNextDns && !retainCredentials ? (
               <ToggleSwitch
                 checked={disguisedTrackers}
                 onChange={onDisguisedTrackersChange}
                 label={t('quick.disguised')}
-                tooltip={`${t('quick.disguisedTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`}
-                disabled={retainCredentials}
+                tooltip={t('quick.disguisedTooltip')}
               />
             ) : null}
 
-            {hasNextDns ? (
+            {hasNextDns && !retainCredentials ? (
               <ToggleSwitch
                 checked={nativeTracking}
                 onChange={onNativeTrackingChange}
                 label={t('quick.native')}
-                tooltip={`${t('quick.nativeTooltip')}${retainCredentials ? ` ${t('quick.requiresCredentials')}` : ""}`}
-                disabled={retainCredentials}
+                tooltip={t('quick.nativeTooltip')}
               />
             ) : null}
 
             {!retainCredentials && noToggles && status === "idle" ? (
               <p className="text-sm leading-5 text-coral">{t('wizard.enableFeature')}</p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {retainCredentials && hasNextDns ? (
+          <section aria-labelledby="unavailable-nextdns-title" className="space-y-3 rounded-lg border border-steel/25 bg-steel/5 p-4">
+            <div className="flex items-start gap-3">
+              <KeyRound className="mt-0.5 size-5 shrink-0 text-steel" aria-hidden="true" />
+              <div>
+                <h3 id="unavailable-nextdns-title" className="text-sm font-semibold text-ink">
+                  {t('quick.unavailableTitle')}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-ink/65">{t('quick.unavailableDesc')}</p>
+              </div>
+            </div>
+            <ul className="space-y-1.5 pl-8 text-sm text-ink/70">
+              <li>{t('quick.blockAds')}</li>
+              <li>{t('quick.disguised')}</li>
+              <li>{t('quick.native')}</li>
+            </ul>
+            {onConfigureFromScratch ? (
+              <SecondaryButton type="button" onClick={onConfigureFromScratch} className="ml-8 min-h-9 py-1.5">
+                {t('quick.openFullSetup')}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </SecondaryButton>
             ) : null}
           </section>
         ) : null}

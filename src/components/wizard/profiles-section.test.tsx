@@ -136,6 +136,31 @@ describe("ProfilesSection", () => {
     expect(screen.getByText("DNS: Cloudflare")).toBeVisible();
   });
 
+  it("restores the DNS donor selected for every retained profile", () => {
+    renderSection({
+      profiles: [
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: "https://xbox-dns.ru/dns-query" },
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: "https://dns.comss.one/dns-query" },
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: "https://custom.test/dns-query" },
+        { clientId: "", authSecret: "", provider: "nextdns", donorDns: "" }
+      ],
+      retainCredentials: true
+    });
+
+    expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue("https://xbox-dns.ru/dns-query");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "1" } });
+    expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue("https://dns.comss.one/dns-query");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "2" } });
+    expect(screen.getByRole("combobox", { name: "DNS-донор" }))
+      .toHaveDisplayValue("Свой адрес: https://custom.test/dns-query");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Выбрать профиль" }), { target: { value: "3" } });
+    expect(screen.getByRole("checkbox", { name: "DNS-донор" })).not.toBeChecked();
+    expect(screen.queryByRole("combobox", { name: "DNS-донор" })).not.toBeInTheDocument();
+  });
+
   it("validates complete credentials after the debounce delay", async () => {
     vi.useFakeTimers();
     apiMocks.validateCredentials.mockResolvedValue({ valid: true });

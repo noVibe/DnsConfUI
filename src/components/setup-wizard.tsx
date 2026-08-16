@@ -488,6 +488,7 @@ export function SetupWizard() {
             starring={starring}
             onStar={handleStar}
             retainCredentials={retainCredentials}
+            onConfigureFromScratch={configureFromScratch}
           />
         </div>
       )}

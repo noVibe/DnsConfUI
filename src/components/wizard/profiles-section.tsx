@@ -235,7 +235,9 @@ export function ProfilesSection({
                   aria-label={t('profiles.donor')}
                 >
                   {!isDnsDonorPreset(profiles[selected].donorDns) ? (
-                    <option value={profiles[selected].donorDns}>{t('profiles.donorCustom')}</option>
+                    <option value={profiles[selected].donorDns}>
+                      {t('profiles.donorCustom')}: {profiles[selected].donorDns}
+                    </option>
                   ) : null}
                   {DNS_DONORS.map((donor) => (
                     <option key={donor.value} value={donor.value}>{donor.label}</option>
