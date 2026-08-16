@@ -34,6 +34,12 @@ describe("ExistingSetupChoice", () => {
     const props = renderChoice();
 
     expect(screen.getByText(/alice\/DnsConf/)).toBeVisible();
+    for (const description of [
+      screen.getByText(/Снова указать ID профилей/),
+      screen.getByText(/Оставить CLIENT_ID и AUTH_SECRET/)
+    ]) {
+      expect(description).toHaveClass("mt-3", "rounded-md", "border", "bg-white/50", "px-3", "py-2");
+    }
     fireEvent.click(screen.getByRole("button", { name: /Настроить всё заново/ }));
     fireEvent.click(screen.getByRole("button", { name: /Сохранить учётные данные/ }));
     expect(props.onConfigureFromScratch).toHaveBeenCalledOnce();

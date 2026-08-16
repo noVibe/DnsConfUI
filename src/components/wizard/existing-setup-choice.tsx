@@ -71,7 +71,9 @@ export function ExistingSetupChoice({
         >
           <RotateCcw className="size-5 text-steel" aria-hidden="true" />
           <div className="mt-3 font-semibold text-ink">{t("existing.freshTitle")}</div>
-          <p className="mt-1 text-sm leading-6 text-ink/65">{t("existing.freshDesc")}</p>
+          <p className="mt-3 rounded-md border border-line/70 bg-white/50 px-3 py-2 text-sm leading-6 text-ink/65">
+            {t("existing.freshDesc")}
+          </p>
         </button>
 
         <button
@@ -82,7 +84,7 @@ export function ExistingSetupChoice({
         >
           <KeyRound className="size-5 text-moss" aria-hidden="true" />
           <div className="mt-3 font-semibold text-ink">{t("existing.retainTitle")}</div>
-          <p className="mt-1 text-sm leading-6 text-ink/65">
+          <p className="mt-3 rounded-md border border-line/70 bg-white/50 px-3 py-2 text-sm leading-6 text-ink/65">
             {setup.config ? t("existing.retainDesc") : t("existing.noDnsVariable")}
           </p>
         </button>
