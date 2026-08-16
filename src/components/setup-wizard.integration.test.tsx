@@ -50,10 +50,8 @@ describe("SetupWizard retained navigation", () => {
     const setupTitle = screen.getByRole("heading", { name: "Настройка конфигурации" });
     const quickModeButton = screen.getByRole("button", { name: "Быстрая" });
     expect(setupTitle.parentElement).toContainElement(quickModeButton);
+    expect(setupTitle.parentElement).toHaveClass("flex-col", "sm:flex-row", "sm:justify-between");
     expect(quickModeButton.parentElement).toHaveClass("ml-auto");
-    expect(setupTitle.parentElement?.parentElement).toHaveClass(
-      "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
-    );
     fireEvent.click(screen.getByRole("button", { name: "Перейти к полной настройке" }));
 
     const returnButton = screen.getByRole("button", {
