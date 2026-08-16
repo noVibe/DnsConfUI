@@ -23,8 +23,8 @@ export function ToggleSwitch({
   const inputId = useId();
 
   return (
-    <div className={`flex items-start gap-3 rounded-lg border border-line bg-white p-4 transition ${disabled ? "opacity-55" : "hover:border-steel"}`}>
-      <label htmlFor={inputId} className={`relative mt-0.5 shrink-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+    <div className={`flex items-center gap-3 rounded-lg border border-line bg-white p-4 transition ${disabled ? "opacity-55" : "hover:border-steel"}`}>
+      <label htmlFor={inputId} className={`relative shrink-0 ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
         <input
           id={inputId}
           type="checkbox"

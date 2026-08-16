@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, KeyRound, Loader2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, KeyRound, Loader2, X } from "lucide-react";
 import type { UseFormSetValue } from "react-hook-form";
 import type { DnsConfConfig } from "@/domain/dnsconf-config";
 import type { ProvisionResult } from "@/lib/github/provisioning";
@@ -45,7 +45,8 @@ export function QuickModeUI({
   starring,
   onStar,
   retainCredentials = false,
-  onConfigureFromScratch
+  onConfigureFromScratch,
+  onReturnToRetained
 }: {
   mode: "quick" | "expert";
   setMode: (m: "quick" | "expert") => void;
@@ -81,6 +82,7 @@ export function QuickModeUI({
   onStar: () => Promise<void>;
   retainCredentials?: boolean;
   onConfigureFromScratch?: () => void;
+  onReturnToRetained?: () => void;
 }) {
   const { t } = useLocale();
   const hasNextDns = profiles.some((profile) => profile.provider === "nextdns");
@@ -101,6 +103,13 @@ export function QuickModeUI({
             onValidChange={onProfilesValidChange}
             retainCredentials={retainCredentials}
           />
+
+        {onReturnToRetained ? (
+          <SecondaryButton type="button" onClick={onReturnToRetained} className="w-full sm:w-auto">
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            {t('existing.returnToRetained')}
+          </SecondaryButton>
+        ) : null}
 
         {providerLabel ? (
           <section className="space-y-3 rounded-lg border border-line bg-paper p-4">

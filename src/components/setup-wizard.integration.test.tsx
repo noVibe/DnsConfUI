@@ -50,15 +50,16 @@ describe("SetupWizard retained navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Перейти к полной настройке" }));
 
     const returnButton = screen.getByRole("button", {
-      name: "Вернуться без повторного ввода учётных данных"
+      name: "Обратно к настройке без учётных данных"
     });
     expect(returnButton).toBeVisible();
+    expect(returnButton.previousElementSibling).toHaveTextContent("Профили");
 
     fireEvent.click(returnButton);
 
     expect(screen.getByRole("button", { name: "Перейти к полной настройке" })).toBeVisible();
     expect(screen.queryByRole("button", {
-      name: "Вернуться без повторного ввода учётных данных"
+      name: "Обратно к настройке без учётных данных"
     })).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "DNS-донор" })).toHaveValue(DEFAULT_DNS_DONOR);
   });

@@ -422,23 +422,11 @@ export function SetupWizard() {
 
   return (
     <section aria-labelledby="setup-title">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col items-start gap-3">
         <h2 id="setup-title" className="text-2xl font-semibold text-ink">
           {t('wizard.setup')}
         </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          {canReturnToRetainedSetup ? (
-            <SecondaryButton
-              type="button"
-              onClick={configureWithRetainedCredentials}
-              className="min-h-9 py-1.5"
-            >
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              {t('existing.returnToRetained')}
-            </SecondaryButton>
-          ) : null}
-          <ModeTabs mode={mode} setMode={setMode} />
-        </div>
+        <ModeTabs mode={mode} setMode={setMode} />
       </div>
 
       {mode === "expert" ? (
@@ -463,6 +451,16 @@ export function SetupWizard() {
               onValidChange={setAllProfilesValid}
               retainCredentials={retainCredentials}
             />
+            {canReturnToRetainedSetup ? (
+              <SecondaryButton
+                type="button"
+                onClick={configureWithRetainedCredentials}
+                className="w-full sm:w-auto"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                {t('existing.returnToRetained')}
+              </SecondaryButton>
+            ) : null}
           </div>
 
           <aside className="space-y-5">
@@ -517,6 +515,7 @@ export function SetupWizard() {
             onStar={handleStar}
             retainCredentials={retainCredentials}
             onConfigureFromScratch={configureFromRetainedSetup}
+            onReturnToRetained={canReturnToRetainedSetup ? configureWithRetainedCredentials : undefined}
           />
         </div>
       )}
