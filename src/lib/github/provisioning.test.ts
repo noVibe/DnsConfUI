@@ -37,7 +37,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "https://dns.geohide.ru:444/dns-query", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
       },
       request,
       encryptSecret
@@ -66,6 +66,10 @@ describe("provisionDnsConfRepository", () => {
     expect(request).toHaveBeenCalledWith(
       "POST /repos/{owner}/{repo}/actions/variables",
       expect.objectContaining({ name: "DNS", value: "cloudflare" })
+    );
+    expect(request).toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/actions/variables",
+      expect.objectContaining({ name: "DONOR_DNS", value: "https://dns.geohide.ru:444/dns-query" })
     );
     expect(request).toHaveBeenCalledWith(
       "POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",
@@ -104,7 +108,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -154,7 +158,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -211,7 +215,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`

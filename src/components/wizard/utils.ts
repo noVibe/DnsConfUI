@@ -19,7 +19,7 @@ export function translatedError(msg: string | undefined, t: (key: LocaleKey, par
   return msg;
 }
 
-export function extractProfileErrors(parsed: { success: boolean; error?: { issues: Array<{ path: Array<string | number | symbol>; message: string }> } }, field: "clientId" | "authSecret") {
+export function extractProfileErrors(parsed: { success: boolean; error?: { issues: Array<{ path: Array<string | number | symbol>; message: string }> } }, field: "clientId" | "authSecret" | "donorDns") {
   if (parsed.success || !parsed.error) return undefined;
   return parsed.error.issues
     .filter(i => i.path[0] === "profiles" && typeof i.path[1] === "number" && i.path[2] === field)

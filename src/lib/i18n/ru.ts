@@ -72,6 +72,11 @@ export const locale: Record<LocaleKey, string> = {
   "profiles.hint": "Каждый профиль — отдельная DNS-конфигурация. Профили используют общие источники BLOCK и REDIRECT.",
   "profiles.providerNextDNS": "NextDNS",
   "profiles.providerCloudflare": "Cloudflare",
+  "profiles.donor": "DNS-донор",
+  "profiles.donorTooltip": "Запрашивает у этого DNS-резолвера актуальные IPv4-адреса перед загрузкой правил перенаправления, заменяя устаревшие IP из hosts-источников.",
+  "profiles.donorPlaceholder": "IPv4-адрес или DoH URL",
+  "profiles.donorCustom": "Свой адрес",
+  "profiles.donorInvalid": "Введите корректный IPv4-адрес или DoH URL",
 
   "script.title": "Поведение скрипта",
   "script.oldSettings": "Старые настройки BLOCK/REDIRECT будут обновлены из указанных источников.",
@@ -104,6 +109,8 @@ export const locale: Record<LocaleKey, string> = {
   "review.id": "ID: {value}",
   "review.secret": "Секрет: {value}",
   "review.dns": "DNS: {value}",
+  "review.donor": "DNS-донор: {value}",
+  "review.donorDisabled": "Отключён",
   "review.none": "Нет",
 
   "provision.desc": "Применить настройки DNS-провайдера через API и настроить форк DnsConf на GitHub.",

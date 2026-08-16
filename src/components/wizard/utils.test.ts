@@ -179,7 +179,7 @@ describe("normalizeValues", () => {
   });
 
   it("preserves profiles unchanged", () => {
-    const profiles = [{ clientId: "abc", authSecret: "sec", provider: "cloudflare" as const }];
+    const profiles = [{ clientId: "abc", authSecret: "sec", provider: "cloudflare" as const, donorDns: "https://dns.geohide.ru:444/dns-query" }];
     const result = normalizeValues({
       profiles,
       blocklists: [],

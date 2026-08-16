@@ -91,8 +91,8 @@ export function SetupWizard() {
     if (profiles.length === 0) return false;
     if (mixedProviderIndices.size > 0) return false;
     const allFilled = profiles.every(p => p.clientId?.trim() && p.authSecret?.trim());
-    return allFilled && hasToggles && !!profiles[0]?.provider && allProfilesValid;
-  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid]);
+    return allFilled && hasToggles && !!profiles[0]?.provider && allProfilesValid && parsed.success;
+  }, [values.profiles, hasToggles, mixedProviderIndices, allProfilesValid, parsed.success]);
 
   async function quickProvision() {
     if (!token) return;
@@ -356,6 +356,7 @@ export function SetupWizard() {
               setValue={form.setValue}
               profileClientIdErrors={extractProfileErrors(parsed, "clientId")}
               profileSecretErrors={extractProfileErrors(parsed, "authSecret")}
+              profileDonorErrors={extractProfileErrors(parsed, "donorDns")}
               onValidChange={setAllProfilesValid}
             />
           </div>
@@ -389,6 +390,7 @@ export function SetupWizard() {
             setValue={form.setValue}
             profileClientIdErrors={extractProfileErrors(parsed, "clientId")}
             profileSecretErrors={extractProfileErrors(parsed, "authSecret")}
+            profileDonorErrors={extractProfileErrors(parsed, "donorDns")}
             mixedProviderIndices={mixedProviderIndices}
             geoBlock={geoBlock}
             geoHideChecked={geoHideChecked}

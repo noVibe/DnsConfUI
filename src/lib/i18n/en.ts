@@ -70,6 +70,11 @@ export const locale = {
   "profiles.hint": "Each profile is a separate DNS configuration. Profiles share the same BLOCK and REDIRECT sources.",
   "profiles.providerNextDNS": "NextDNS",
   "profiles.providerCloudflare": "Cloudflare",
+  "profiles.donor": "DNS donor",
+  "profiles.donorTooltip": "Queries this DNS resolver for current IPv4 addresses before uploading redirect rules, replacing outdated IPs from hosts sources.",
+  "profiles.donorPlaceholder": "IPv4 address or DoH URL",
+  "profiles.donorCustom": "Custom",
+  "profiles.donorInvalid": "Enter a valid IPv4 address or DoH URL",
 
   "script.title": "Script behaviour",
   "script.oldSettings": "Old BLOCK/REDIRECT settings are about to be updated via provided sources.",
@@ -102,6 +107,8 @@ export const locale = {
   "review.id": "ID: {value}",
   "review.secret": "Secret: {value}",
   "review.dns": "DNS: {value}",
+  "review.donor": "DNS donor: {value}",
+  "review.donorDisabled": "Disabled",
   "review.none": "None",
 
   "provision.desc": "Apply DNS provider settings via API and provision your DnsConf fork on GitHub.",

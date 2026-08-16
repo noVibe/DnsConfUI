@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import type { buildDnsConfPayload } from "@/domain/dnsconf-config";
+import { DISABLED_DNS_DONOR, getDnsDonorLabel } from "@/domain/dns-donors";
 import { useLocale } from "@/lib/i18n/context";
 import { SummaryLine } from "./summary-line";
 
@@ -26,6 +27,7 @@ export function ReviewPanel({ payload, valid }: { payload: ReturnType<typeof bui
           const ids = payload.secrets.CLIENT_ID.split(",");
           const secrets = payload.secrets.AUTH_SECRET.split(",");
           const dns = payload.variables.DNS.split(",");
+          const donors = payload.variables.DONOR_DNS.split(",");
           return (
             <div className="space-y-2">
               {ids.map((id, i) => (
@@ -34,6 +36,7 @@ export function ReviewPanel({ payload, valid }: { payload: ReturnType<typeof bui
                   <div className="mt-1 text-ink/70">{t('review.id', { value: id })}</div>
                   <div className="text-ink/70">{t('review.secret', { value: "*".repeat(Math.min(secrets[i]?.length ?? 0, 20)) })}</div>
                   <div className="text-ink/70">{t('review.dns', { value: dns[i] ?? "" })}</div>
+                  <div className="text-ink/70">{t('review.donor', { value: donors[i] === DISABLED_DNS_DONOR ? t('review.donorDisabled') : getDnsDonorLabel(donors[i] ?? "") ?? donors[i] ?? "" })}</div>
                 </div>
               ))}
             </div>
