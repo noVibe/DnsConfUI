@@ -12,7 +12,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
   }
 
-  const parsed = tokenRequestSchema.safeParse(await request.json());
+  const body = await request.json().catch(() => null);
+  const parsed = tokenRequestSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ message: "Device code is required." }, { status: 400 });

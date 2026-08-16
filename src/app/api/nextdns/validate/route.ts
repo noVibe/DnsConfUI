@@ -7,7 +7,8 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const parsed = requestSchema.safeParse(await request.json());
+  const body = await request.json().catch(() => null);
+  const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ valid: false, error: "Invalid request body." }, { status: 400 });

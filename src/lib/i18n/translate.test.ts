@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "./translate";
+import { locale as enLocale } from "./en";
+import { locale as ruLocale } from "./ru";
 
 describe("translate", () => {
   it("returns the Russian translation for ru locale", () => {
@@ -41,5 +43,24 @@ describe("translate", () => {
 
   it("interpolates multiple different parameters", () => {
     expect(translate("en", "profiles.dns", { provider: "NextDNS" })).toBe("DNS: NextDNS");
+  });
+
+  it("keeps English and Russian locale keys aligned", () => {
+    expect(Object.keys(ruLocale).sort()).toEqual(Object.keys(enLocale).sort());
+  });
+
+  it("keeps interpolation placeholders aligned between locales", () => {
+    const placeholders = (value: string) => [...value.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]).sort();
+
+    for (const key of Object.keys(enLocale) as Array<keyof typeof enLocale>) {
+      expect(placeholders(ruLocale[key]), key).toEqual(placeholders(enLocale[key]));
+    }
+  });
+
+  it("does not contain empty translations", () => {
+    for (const [key, value] of Object.entries(enLocale)) {
+      expect(value.trim(), `English translation ${key}`).not.toBe("");
+      expect(ruLocale[key as keyof typeof ruLocale].trim(), `Russian translation ${key}`).not.toBe("");
+    }
   });
 });

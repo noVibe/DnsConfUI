@@ -43,7 +43,8 @@ async function apiFetch(
 }
 
 export async function POST(request: Request) {
-  const parsed = requestSchema.safeParse(await request.json());
+  const body = await request.json().catch(() => null);
+  const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ success: false, error: "Invalid request body." }, { status: 400 });
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
   if (blockAds) {
     profilePatch.privacy = {
       ...(profilePatch.privacy as object || {}),
-      disguisedTrackers: true,
+      disguisedTrackers,
       blocklists: ADS_BLOCKLIST_IDS.map(id => ({ id }))
     };
     profilePatch.security = {

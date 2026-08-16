@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { provisionDnsConfRepository } from "./provisioning";
+import { isForkBehind, provisionDnsConfRepository, starRepository, syncFork } from "./provisioning";
 
 describe("provisionDnsConfRepository", () => {
   it("forks DnsConf, uploads encrypted secrets, upserts variables, and dispatches the workflow", async () => {
@@ -230,5 +230,142 @@ describe("provisionDnsConfRepository", () => {
         value: "https://example.com/list"
       }
     );
+  });
+
+  it("reports a failed workflow conclusion", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 9, html_url: "https://example.test/run/9" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "failure" } };
+      }
+      return { data: {} };
+    });
+
+    await expect(provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`,
+    })).rejects.toThrow("Workflow run finished with conclusion: failure");
+  });
+
+  it("skips empty variables and reports provisioning steps in order", async () => {
+    const steps: string[] = [];
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 1, html_url: "https://example.test/run/1" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
+      if (route === "PUT /repos/{owner}/{repo}/actions/permissions") {
+        throw new Error("permissions endpoint unavailable");
+      }
+      return { data: {} };
+    });
+
+    await provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`,
+      onStep: (step) => { steps.push(step); },
+    });
+
+    expect(steps).toEqual(["fork", "secrets", "dispatch"]);
+    expect(request).not.toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/actions/variables",
+      expect.objectContaining({ name: "BLOCK" }),
+    );
+  });
+
+  it("rethrows variable creation errors that are not conflicts", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") return { data: { fork: true } };
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "POST /repos/{owner}/{repo}/actions/variables") {
+        throw Object.assign(new Error("server error"), { status: 500 });
+      }
+      return { data: {} };
+    });
+
+    await expect(provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`,
+    })).rejects.toThrow("server error");
+  });
+});
+
+describe("fork maintenance helpers", () => {
+  it("detects when a fork is behind upstream", async () => {
+    const request = vi.fn(async () => ({ data: { behind_by: 3 } }));
+
+    await expect(isForkBehind(request, "alice", "DnsConf", "noVibe", "DnsConf")).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/compare/{basehead}", {
+      owner: "alice",
+      repo: "DnsConf",
+      basehead: "main...noVibe:DnsConf:main",
+    });
+  });
+
+  it("returns false when comparison fails", async () => {
+    const request = vi.fn(async () => { throw new Error("network"); });
+
+    await expect(isForkBehind(request, "alice", "DnsConf", "noVibe", "DnsConf")).resolves.toBe(false);
+  });
+
+  it("syncs a fork from its main branch", async () => {
+    const request = vi.fn(async () => ({ data: {} }));
+
+    await syncFork(request, "alice", "DnsConf");
+
+    expect(request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/merge-upstream", {
+      owner: "alice",
+      repo: "DnsConf",
+      branch: "main",
+    });
+  });
+
+  it("stars a repository", async () => {
+    const request = vi.fn(async () => ({ data: {} }));
+
+    await starRepository(request, "noVibe", "DnsConf");
+
+    expect(request).toHaveBeenCalledWith("PUT /user/starred/{owner}/{repo}", {
+      owner: "noVibe",
+      repo: "DnsConf",
+    });
   });
 });
