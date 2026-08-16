@@ -87,10 +87,14 @@ describe("QuickModeUI", () => {
     expect(screen.queryByRole("checkbox", { name: "Защита от встроенного отслеживания" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Обход гео-блокировок" })).toBeEnabled();
     expect(screen.getByRole("heading", { name: "Недоступно без учётных данных" })).toBeVisible();
-    expect(screen.getByText(/Их текущее состояние неизвестно/)).toBeVisible();
-    expect(screen.getByText("Блокировка рекламы и трекеров")).toBeVisible();
-    expect(screen.getByText("Блокировка скрытых сторонних трекеров")).toBeVisible();
-    expect(screen.getByText("Защита от встроенного отслеживания")).toBeVisible();
+    expect(screen.getByText("Настройки ниже невозможно изменить без ввода CLIENT_ID и AUTH_SECRET.")).toBeVisible();
+    for (const label of [
+      "Блокировка рекламы и трекеров",
+      "Блокировка скрытых сторонних трекеров",
+      "Защита от встроенного отслеживания"
+    ]) {
+      expect(screen.getByText(label).closest("li")).toHaveClass("rounded-md", "border", "bg-white/60");
+    }
 
     fireEvent.click(screen.getByRole("button", { name: "Перейти к полной настройке" }));
     expect(onConfigureFromScratch).toHaveBeenCalledOnce();

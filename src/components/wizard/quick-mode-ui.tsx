@@ -203,10 +203,13 @@ export function QuickModeUI({
                 <p className="mt-1 text-sm leading-6 text-ink/65">{t('quick.unavailableDesc')}</p>
               </div>
             </div>
-            <ul className="space-y-1.5 pl-8 text-sm text-ink/70">
-              <li>{t('quick.blockAds')}</li>
-              <li>{t('quick.disguised')}</li>
-              <li>{t('quick.native')}</li>
+            <ul className="grid gap-2 pl-8 text-sm text-ink/75">
+              {[t('quick.blockAds'), t('quick.disguised'), t('quick.native')].map((label) => (
+                <li key={label} className="flex items-center gap-2 rounded-md border border-line/70 bg-white/60 px-3 py-2 font-medium">
+                  <span className="size-1.5 shrink-0 rounded-full bg-steel" aria-hidden="true" />
+                  {label}
+                </li>
+              ))}
             </ul>
             {onConfigureFromScratch ? (
               <SecondaryButton type="button" onClick={onConfigureFromScratch} className="ml-8 min-h-9 py-1.5">

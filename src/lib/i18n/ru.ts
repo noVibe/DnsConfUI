@@ -156,7 +156,7 @@ export const locale: Record<LocaleKey, string> = {
   "quick.native": "Защита от встроенного отслеживания",
   "quick.nativeTooltip": "Блокирует встроенные трекеры на платформах и устройствах Apple, Windows, Samsung, Huawei, Xiaomi, Roku, Alexa и Sonos. Настройка применяется через API NextDNS.",
   "quick.unavailableTitle": "Недоступно без учётных данных",
-  "quick.unavailableDesc": "Эти настройки API NextDNS нельзя прочитать или изменить, пока CLIENT_ID и AUTH_SECRET хранятся только в GitHub Secrets. Их текущее состояние неизвестно.",
+  "quick.unavailableDesc": "Настройки ниже невозможно изменить без ввода CLIENT_ID и AUTH_SECRET.",
   "quick.openFullSetup": "Перейти к полной настройке",
   "quick.progress": "Прогресс",
   "quick.blocklistsStep": "Блокировка рекламы и скрытых трекеров",

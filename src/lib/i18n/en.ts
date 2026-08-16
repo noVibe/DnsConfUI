@@ -154,7 +154,7 @@ export const locale = {
   "quick.native": "Native Tracking Protection",
   "quick.nativeTooltip": "Blocks built-in trackers on Apple, Windows, Samsung, Huawei, Xiaomi, Roku, Alexa, and Sonos platforms and devices. Configured via the NextDNS API.",
   "quick.unavailableTitle": "Unavailable without credentials",
-  "quick.unavailableDesc": "These NextDNS API settings cannot be read or changed while CLIENT_ID and AUTH_SECRET remain only in GitHub Secrets. Their current state is unknown.",
+  "quick.unavailableDesc": "The settings below cannot be changed without entering CLIENT_ID and AUTH_SECRET.",
   "quick.openFullSetup": "Open full setup",
   "quick.progress": "Progress",
   "quick.blocklistsStep": "Block ads and disguised trackers",

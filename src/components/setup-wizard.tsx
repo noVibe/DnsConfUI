@@ -422,11 +422,13 @@ export function SetupWizard() {
 
   return (
     <section aria-labelledby="setup-title">
-      <div className="flex flex-col items-start gap-3">
-        <h2 id="setup-title" className="text-2xl font-semibold text-ink">
-          {t('wizard.setup')}
-        </h2>
-        <ModeTabs mode={mode} setMode={setMode} />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+          <h2 id="setup-title" className="text-2xl font-semibold text-ink">
+            {t('wizard.setup')}
+          </h2>
+          <ModeTabs mode={mode} setMode={setMode} />
+        </div>
       </div>
 
       {mode === "expert" ? (

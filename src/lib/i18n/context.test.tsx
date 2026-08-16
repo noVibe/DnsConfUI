@@ -23,11 +23,11 @@ describe("LocaleProvider", () => {
     );
 
     expect(screen.getByTestId("donor-tooltip")).toHaveTextContent("Запрашивает у этого DNS-резолвера");
-    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("Эти настройки API NextDNS нельзя прочитать или изменить");
+    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("Настройки ниже невозможно изменить без ввода CLIENT_ID и AUTH_SECRET");
 
     fireEvent.click(screen.getByRole("button", { name: "Switch" }));
 
     expect(screen.getByTestId("donor-tooltip")).toHaveTextContent("Queries this DNS resolver");
-    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("These NextDNS API settings cannot be read or changed");
+    expect(screen.getByTestId("retained-tooltip")).toHaveTextContent("The settings below cannot be changed without entering CLIENT_ID and AUTH_SECRET");
   });
 });
