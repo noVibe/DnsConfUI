@@ -53,6 +53,7 @@ export const locale: Record<LocaleKey, string> = {
   "wizard.fork": "Создание форка",
   "wizard.secrets": "Секреты и переменные",
   "wizard.run": "Запуск workflow",
+  "wizard.workflow": "Выполнение workflow",
   "wizard.provisionFailed": "Ошибка настройки.",
   "wizard.configIncomplete": "Конфигурация неполная или истёк срок авторизации GitHub.",
   "wizard.ghProvisionFailed": "Ошибка настройки GitHub.",

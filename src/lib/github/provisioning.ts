@@ -11,7 +11,7 @@ type GitHubRequest = (route: string, parameters?: Record<string, unknown>) => Pr
 
 type EncryptSecret = (value: string, publicKey: string) => Promise<string>;
 
-export type ProvisionStep = "fork" | "secrets" | "dispatch";
+export type ProvisionStep = "fork" | "secrets" | "dispatch" | "workflow";
 
 export type ProvisionDnsConfInput = {
   sourceOwner: string;
@@ -131,12 +131,13 @@ export async function provisionDnsConfRepository({
   });
 
   const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(request, owner, repo, workflowFileName);
+  await onStep?.("dispatch");
 
   if (workflowRunId) {
     await waitForWorkflowRunCompletion(request, owner, repo, workflowRunId, profileCount);
   }
 
-  await onStep?.("dispatch");
+  await onStep?.("workflow");
 
   return { repository: { owner, repo }, workflowRunUrl, workflowRunId };
 }

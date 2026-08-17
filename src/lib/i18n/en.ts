@@ -51,6 +51,7 @@ export const locale = {
   "wizard.fork": "Create fork",
   "wizard.secrets": "Secrets & variables",
   "wizard.run": "Run workflow",
+  "wizard.workflow": "Workflow execution",
   "wizard.provisionFailed": "Provisioning failed.",
   "wizard.configIncomplete": "Configuration is incomplete or GitHub authorization has expired.",
   "wizard.ghProvisionFailed": "GitHub provisioning failed.",

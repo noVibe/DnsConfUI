@@ -98,6 +98,54 @@ describe("provisionDnsConfRepository", () => {
     );
   });
 
+  it("reports workflow dispatch before waiting for the run to complete", async () => {
+    const steps: string[] = [];
+    let resolveRun!: (value: { data: { status: string; conclusion: string } }) => void;
+    const runCompletion = new Promise<{ data: { status: string; conclusion: string } }>((resolve) => {
+      resolveRun = resolve;
+    });
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 7, html_url: "https://example.test/run/7" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return runCompletion;
+      }
+      return { data: {} };
+    });
+
+    const provisioning = provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: {},
+        variables: {
+          DNS: "nextdns",
+          DONOR_DNS: "-",
+          BLOCK: "https://example.test/block",
+          REDIRECT: "https://example.test/redirect",
+          EXCLUDE_REDIRECT: "example.test"
+        }
+      },
+      request,
+      retainCredentials: true,
+      onStep: (step) => { steps.push(step); }
+    });
+
+    await vi.waitFor(() => {
+      expect(steps).toEqual(["fork", "secrets", "dispatch"]);
+    });
+
+    resolveRun({ data: { status: "completed", conclusion: "success" } });
+    await expect(provisioning).resolves.toEqual(expect.objectContaining({ workflowRunId: 7 }));
+    expect(steps).toEqual(["fork", "secrets", "dispatch", "workflow"]);
+  });
+
   it("reuses existing fork when one already exists", async () => {
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") {
@@ -393,7 +441,7 @@ describe("provisionDnsConfRepository", () => {
       onStep: (step) => { steps.push(step); },
     });
 
-    expect(steps).toEqual(["fork", "secrets", "dispatch"]);
+    expect(steps).toEqual(["fork", "secrets", "dispatch", "workflow"]);
     expect(request).toHaveBeenCalledWith(
       "DELETE /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
       { owner: "alice", repo: "DnsConf", environment_name: "DNS", name: "BLOCK" },

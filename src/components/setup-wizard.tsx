@@ -243,6 +243,7 @@ export function SetupWizard() {
     steps.push({ id: "fork", label: t(retainCredentials ? 'wizard.syncFork' : 'wizard.fork'), status: "pending" });
     steps.push({ id: "secrets", label: t(retainCredentials ? 'wizard.variables' : 'wizard.secrets'), status: "pending" });
     steps.push({ id: "dispatch", label: t('wizard.run'), status: "pending" });
+    steps.push({ id: "workflow", label: t('wizard.workflow'), status: "pending" });
 
     setQuickSteps(steps);
     setStatus("running");
@@ -313,6 +314,9 @@ export function SetupWizard() {
             setQuickSteps(prev => prev.map(s => s.id === "dispatch" ? { ...s, status: "running" } : s));
           } else if (step === "dispatch") {
             setQuickSteps(prev => prev.map(s => s.id === "dispatch" ? { ...s, status: "done" } : s));
+            setQuickSteps(prev => prev.map(s => s.id === "workflow" ? { ...s, status: "running" } : s));
+          } else if (step === "workflow") {
+            setQuickSteps(prev => prev.map(s => s.id === "workflow" ? { ...s, status: "done" } : s));
           }
         }
       });
