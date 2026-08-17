@@ -64,7 +64,11 @@ export function ProvisionPanel({
       <p className="mt-2 text-sm leading-6 text-ink/72">
         {t(retainCredentials ? 'provision.retainDesc' : 'provision.desc')}
       </p>
-      <Button className="mt-4 w-full whitespace-nowrap" onClick={onProvision} disabled={disabled}>
+      <Button
+        className={`mt-4 w-full whitespace-nowrap ${retainCredentials && status === "running" ? "text-xs" : ""}`}
+        onClick={onProvision}
+        disabled={disabled}
+      >
         {status === "running" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : (

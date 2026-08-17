@@ -135,7 +135,7 @@ export const locale = {
   "provision.apply": "Apply configuration",
   "provision.applying": "Applying\u2026",
   "provision.retainApply": "Update configuration",
-  "provision.retainApplying": "Updating\u2026",
+  "provision.retainApplying": "Updating configuration\u2026",
   "provision.configured": "Repository configured",
   "provision.openRun": "Open workflow run",
   "provision.star": "Give a Star!",
