@@ -137,7 +137,7 @@ export const locale: Record<LocaleKey, string> = {
   "provision.apply": "Применить конфигурацию",
   "provision.applying": "Применение\u2026",
   "provision.retainApply": "Обновить конфигурацию",
-  "provision.retainApplying": "Обновление конфигурации\u2026",
+  "provision.retainApplying": "Обновление\u2026",
   "provision.configured": "Репозиторий настроен",
   "provision.openRun": "Открыть запуск workflow",
   "provision.star": "Поставить звезду!",

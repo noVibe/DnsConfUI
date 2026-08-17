@@ -35,7 +35,7 @@ describe("ProvisionPanel", () => {
   it("uses update progress copy when retained configuration is running", () => {
     renderPanel({ retainCredentials: true, status: "running" });
 
-    expect(screen.getByRole("button", { name: "Обновление конфигурации…" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Обновление…" })).toHaveClass("whitespace-nowrap");
   });
 
   it("keeps apply copy for a full configuration", () => {
