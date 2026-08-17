@@ -56,6 +56,7 @@ describe("ProvisionPanel", () => {
       "href",
       "https://github.com/alice/DnsConf/actions/runs/7"
     );
+    expect(screen.getByRole("button", { name: "Поставить звезду!" })).toBeVisible();
   });
 
   it("keeps apply copy for a full configuration", () => {

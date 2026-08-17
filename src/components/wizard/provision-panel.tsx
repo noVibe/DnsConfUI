@@ -51,6 +51,30 @@ function StateButton({
   );
 }
 
+function StarButton({
+  starred,
+  starring,
+  onStar
+}: {
+  starred: boolean;
+  starring: boolean;
+  onStar: () => Promise<void>;
+}) {
+  const { t } = useLocale();
+
+  return (
+    <StateButton
+      label={t('provision.star')}
+      icon={<Star className={`size-4 ${starred ? "fill-moss text-moss" : ""}`} aria-hidden="true" />}
+      onClick={onStar}
+      disabled={starred || starring}
+      state={starring ? "loading" : starred ? "done" : "idle"}
+      activeLabel={t('provision.starring')}
+      doneLabel={t('provision.starred')}
+    />
+  );
+}
+
 export function ProvisionPanel({
   status,
   message,
@@ -94,11 +118,13 @@ export function ProvisionPanel({
       </Button>
 
       {status === "running" && result?.workflowRunUrl ? (
-        <WorkflowRunLink
-          className="mt-4"
-          href={result.workflowRunUrl}
-          label={t('provision.openRun')}
-        />
+        <div className="mt-4 space-y-3">
+          <WorkflowRunLink
+            href={result.workflowRunUrl}
+            label={t('provision.openRun')}
+          />
+          <StarButton starred={starred} starring={starring} onStar={onStar} />
+        </div>
       ) : null}
 
       {status === "done" && result ? (
@@ -113,15 +139,7 @@ export function ProvisionPanel({
               label={t('provision.openRun')}
             />
           ) : null}
-          <StateButton
-            label={t('provision.star')}
-            icon={<Star className={`size-4 ${starred ? "fill-moss text-moss" : ""}`} aria-hidden="true" />}
-            onClick={onStar}
-            disabled={starred || starring}
-            state={starring ? "loading" : starred ? "done" : "idle"}
-            activeLabel={t('provision.starring')}
-            doneLabel={t('provision.starred')}
-          />
+          <StarButton starred={starred} starring={starring} onStar={onStar} />
         </div>
       ) : null}
 
