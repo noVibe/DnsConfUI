@@ -111,7 +111,7 @@ export async function provisionDnsConfRepository({
   }
 
   for (const [name, value] of Object.entries(payload.variables)) {
-    await upsertVariable(request, owner, repo, name, value, variableEnvironment);
+    await syncVariable(request, owner, repo, name, value, variableEnvironment);
   }
 
   await enableActionsIfDisabled(request, owner, repo);
@@ -318,7 +318,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function upsertVariable(
+async function syncVariable(
   request: GitHubRequest,
   owner: string,
   repo: string,
@@ -326,6 +326,20 @@ async function upsertVariable(
   value: string,
   environment: string
 ) {
+  if (value === "") {
+    try {
+      await request("DELETE /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}", {
+        owner,
+        repo,
+        environment_name: environment,
+        name
+      });
+    } catch (error) {
+      if (!isNotFoundError(error)) throw error;
+    }
+    return;
+  }
+
   const parameters = {
     owner,
     repo,

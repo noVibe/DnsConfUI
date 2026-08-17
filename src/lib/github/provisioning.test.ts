@@ -360,7 +360,7 @@ describe("provisionDnsConfRepository", () => {
     })).rejects.toThrow("Workflow run finished with conclusion: failure");
   });
 
-  it("writes empty variables so existing repository values can be cleared", async () => {
+  it("deletes variables with empty values so existing repository values are cleared", async () => {
     const steps: string[] = [];
     const request = vi.fn(async (route: string) => {
       if (route === "GET /user") return { data: { login: "alice" } };
@@ -395,9 +395,51 @@ describe("provisionDnsConfRepository", () => {
 
     expect(steps).toEqual(["fork", "secrets", "dispatch"]);
     expect(request).toHaveBeenCalledWith(
-      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
-      expect.objectContaining({ environment_name: "DNS", name: "BLOCK", value: "" }),
+      "DELETE /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
+      { owner: "alice", repo: "DnsConf", environment_name: "DNS", name: "BLOCK" },
     );
+    expect(request).not.toHaveBeenCalledWith(
+      "POST /repos/{owner}/{repo}/environments/{environment_name}/variables",
+      expect.objectContaining({ value: "" }),
+    );
+    expect(request).not.toHaveBeenCalledWith(
+      "PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}",
+      expect.objectContaining({ value: "" }),
+    );
+  });
+
+  it("ignores missing variables when applying empty values", async () => {
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") return { data: { login: "alice" } };
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "DELETE /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}") {
+        throw Object.assign(new Error("Variable not found"), { status: 404 });
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ id: 1, html_url: "https://example.test/run/1" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
+      return { data: {} };
+    });
+
+    await expect(provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+      },
+      request,
+      encryptSecret: async (value) => `encrypted:${value}`,
+    })).resolves.toEqual(expect.objectContaining({ repository: { owner: "alice", repo: "DnsConf" } }));
   });
 
   it("rethrows variable creation errors that are not conflicts", async () => {
