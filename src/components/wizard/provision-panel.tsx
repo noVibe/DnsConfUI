@@ -7,6 +7,20 @@ import { Button } from "@/components/ui";
 
 type Status = "idle" | "running" | "done" | "error";
 
+function WorkflowRunLink({ href, label, className = "" }: { href: string; label: string; className?: string }) {
+  return (
+    <a
+      className={`inline-flex w-full items-center justify-center gap-2 rounded-md bg-moss px-3 py-2 text-sm font-medium text-white transition hover:bg-steel ${className}`}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <Play className="size-4" aria-hidden="true" />
+      {label}
+    </a>
+  );
+}
+
 function StateButton({
   label,
   icon,
@@ -79,6 +93,14 @@ export function ProvisionPanel({
           : t(retainCredentials ? 'provision.retainApply' : 'provision.apply')}
       </Button>
 
+      {status === "running" && result?.workflowRunUrl ? (
+        <WorkflowRunLink
+          className="mt-4"
+          href={result.workflowRunUrl}
+          label={t('provision.openRun')}
+        />
+      ) : null}
+
       {status === "done" && result ? (
         <div className="mt-4 space-y-3 rounded-md border border-moss/30 bg-mint p-3 text-sm text-ink">
           <div className="flex items-center gap-2 font-semibold">
@@ -86,15 +108,10 @@ export function ProvisionPanel({
             {t('provision.configured')}
           </div>
           {result.workflowRunUrl ? (
-            <a
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-moss px-3 py-2 text-sm font-medium text-white transition hover:bg-steel"
+            <WorkflowRunLink
               href={result.workflowRunUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Play className="size-4" aria-hidden="true" />
-              {t('provision.openRun')}
-            </a>
+              label={t('provision.openRun')}
+            />
           ) : null}
           <StateButton
             label={t('provision.star')}

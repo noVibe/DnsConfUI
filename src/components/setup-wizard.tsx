@@ -248,6 +248,7 @@ export function SetupWizard() {
     setQuickSteps(steps);
     setStatus("running");
     setMessage("");
+    setResult(null);
 
     try {
       if (!retainCredentials && provider === "nextdns") {
@@ -305,6 +306,7 @@ export function SetupWizard() {
         profileCount: config.profiles.length,
         retainCredentials,
         variableEnvironment: existingSetup?.variableEnvironment,
+        onWorkflowRun: setResult,
         onStep: async (step) => {
           if (step === "fork") {
             setQuickSteps(prev => prev.map(s => s.id === "fork" ? { ...s, status: "done" } : s));
@@ -373,6 +375,7 @@ export function SetupWizard() {
 
     setStatus("running");
     setMessage("");
+    setResult(null);
 
     try {
       const provisionResult = await provisionDnsConfRepository({
@@ -381,7 +384,8 @@ export function SetupWizard() {
         request: createGitHubRequest(token),
         profileCount: parsedConfig.data.profiles.length,
         retainCredentials,
-        variableEnvironment: existingSetup?.variableEnvironment
+        variableEnvironment: existingSetup?.variableEnvironment,
+        onWorkflowRun: setResult
       });
       setResult(provisionResult);
       setStatus("done");

@@ -21,6 +21,7 @@ export type ProvisionDnsConfInput = {
   request: GitHubRequest;
   encryptSecret?: EncryptSecret;
   onStep?: (step: ProvisionStep) => Promise<void> | void;
+  onWorkflowRun?: (result: ProvisionResult) => Promise<void> | void;
   profileCount?: number;
   retainCredentials?: boolean;
   variableEnvironment?: string;
@@ -78,6 +79,7 @@ export async function provisionDnsConfRepository({
   request,
   encryptSecret = encryptGitHubSecret,
   onStep,
+  onWorkflowRun,
   profileCount = 1,
   retainCredentials = false,
   variableEnvironment = DNSCONF_ENVIRONMENT_NAME
@@ -131,6 +133,9 @@ export async function provisionDnsConfRepository({
   });
 
   const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(request, owner, repo, workflowFileName);
+  if (workflowRunUrl) {
+    await onWorkflowRun?.({ repository: { owner, repo }, workflowRunUrl, workflowRunId });
+  }
   await onStep?.("dispatch");
 
   if (workflowRunId) {

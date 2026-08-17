@@ -100,6 +100,7 @@ describe("provisionDnsConfRepository", () => {
 
   it("reports workflow dispatch before waiting for the run to complete", async () => {
     const steps: string[] = [];
+    const onWorkflowRun = vi.fn();
     let resolveRun!: (value: { data: { status: string; conclusion: string } }) => void;
     const runCompletion = new Promise<{ data: { status: string; conclusion: string } }>((resolve) => {
       resolveRun = resolve;
@@ -134,11 +135,17 @@ describe("provisionDnsConfRepository", () => {
       },
       request,
       retainCredentials: true,
+      onWorkflowRun,
       onStep: (step) => { steps.push(step); }
     });
 
     await vi.waitFor(() => {
       expect(steps).toEqual(["fork", "secrets", "dispatch"]);
+    });
+    expect(onWorkflowRun).toHaveBeenCalledWith({
+      repository: { owner: "alice", repo: "DnsConf" },
+      workflowRunUrl: "https://example.test/run/7",
+      workflowRunId: 7
     });
 
     resolveRun({ data: { status: "completed", conclusion: "success" } });
