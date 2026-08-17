@@ -75,7 +75,7 @@ export function QuickModeUI({
   status: "idle" | "running" | "done" | "error";
   message: string;
   disabled: boolean;
-  quickSteps: Array<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }>;
+  quickSteps: Array<{ id: string; status: "pending" | "running" | "done" | "error" | "skipped" }>;
   result: ProvisionResult | null;
   starred: boolean;
   starring: boolean;
@@ -87,6 +87,15 @@ export function QuickModeUI({
   const { t } = useLocale();
   const hasNextDns = profiles.some((profile) => profile.provider === "nextdns");
   const noToggles = !geoBlock && !blockAds && !disguisedTrackers && !nativeTracking;
+  const quickStepLabels: Record<string, string> = {
+    blocklists: t('quick.blocklistsStep'),
+    natives: t('quick.nativeStep'),
+    hosts: t('quick.hostsStep'),
+    fork: t(retainCredentials ? 'wizard.syncFork' : 'wizard.fork'),
+    secrets: t(retainCredentials ? 'wizard.variables' : 'wizard.secrets'),
+    dispatch: t('wizard.run'),
+    workflow: t('wizard.workflow')
+  };
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
@@ -244,7 +253,7 @@ export function QuickModeUI({
                     step.status === "error" ? "text-coral" :
                     "text-ink/60"
                   }>
-                    {step.label}
+                    {quickStepLabels[step.id] ?? step.id}
                   </span>
                 </li>
               ))}

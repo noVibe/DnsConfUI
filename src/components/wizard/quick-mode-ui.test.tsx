@@ -2,8 +2,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
-import { LocaleProvider } from "@/lib/i18n/context";
+import { LocaleProvider, useLocale } from "@/lib/i18n/context";
 import { QuickModeUI } from "./quick-mode-ui";
+
+function LocaleSwitch() {
+  const { setLocale } = useLocale();
+  return <button type="button" onClick={() => setLocale("en")}>Switch locale</button>;
+}
 
 function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> = {}) {
   const callbacks = {
@@ -41,15 +46,44 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
     ...overrides,
   };
 
-  const view = render(<LocaleProvider><QuickModeUI {...props} /></LocaleProvider>);
+  const view = render(
+    <LocaleProvider>
+      <LocaleSwitch />
+      <QuickModeUI {...props} />
+    </LocaleProvider>
+  );
   return { ...callbacks, container: view.container };
 }
 
 describe("QuickModeUI", () => {
+  it("updates active progress labels when the global locale changes", () => {
+    renderQuickMode({
+      status: "running",
+      retainCredentials: true,
+      quickSteps: [
+        { id: "fork", status: "done" },
+        { id: "secrets", status: "done" },
+        { id: "dispatch", status: "done" },
+        { id: "workflow", status: "running" }
+      ]
+    });
+
+    for (const label of ["Обновление существующего форка", "Переменные", "Запуск workflow", "Выполнение workflow"]) {
+      expect(screen.getByText(label)).toBeVisible();
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch locale" }));
+
+    for (const label of ["Sync existing fork", "Variables", "Run workflow", "Workflow execution"]) {
+      expect(screen.getByText(label)).toBeVisible();
+    }
+    expect(screen.queryByText("Выполнение workflow")).not.toBeInTheDocument();
+  });
+
   it("uses zero-minimum grid tracks so long controls cannot squeeze the provision panel", () => {
     const { container } = renderQuickMode();
 
-    expect(container.firstElementChild).toHaveClass(
+    expect(container.lastElementChild).toHaveClass(
       "xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]"
     );
   });

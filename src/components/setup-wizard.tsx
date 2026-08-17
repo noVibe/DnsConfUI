@@ -80,7 +80,7 @@ export function SetupWizard() {
     }
   }, [geoBlock, geoHideChecked, retainedCustomRedirects.length]);
 
-  const [quickSteps, setQuickSteps] = useState<{ id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
+  const [quickSteps, setQuickSteps] = useState<{ id: string; status: "pending" | "running" | "done" | "error" | "skipped" }[]>([]);
   const [allProfilesValid, setAllProfilesValid] = useState(false);
   const form = useForm<DnsConfConfig>({ defaultValues: defaultDnsConfConfig, mode: "onChange" });
   const values = form.watch();
@@ -225,25 +225,25 @@ export function SetupWizard() {
       return;
     }
 
-    const steps: { id: string; label: string; status: "pending" | "running" | "done" | "error" | "skipped" }[] = [];
+    const steps: { id: string; status: "pending" | "running" | "done" | "error" | "skipped" }[] = [];
 
     if (!retainCredentials && provider === "nextdns") {
       if (blockAds || disguisedTrackers) {
-        steps.push({ id: "blocklists", label: t('quick.blocklistsStep'), status: "pending" });
+        steps.push({ id: "blocklists", status: "pending" });
       }
       if (nativeTracking) {
-        steps.push({ id: "natives", label: t('quick.nativeStep'), status: "pending" });
+        steps.push({ id: "natives", status: "pending" });
       }
     }
 
     if (geoBlock) {
-      steps.push({ id: "hosts", label: t('quick.hostsStep'), status: "pending" });
+      steps.push({ id: "hosts", status: "pending" });
     }
 
-    steps.push({ id: "fork", label: t(retainCredentials ? 'wizard.syncFork' : 'wizard.fork'), status: "pending" });
-    steps.push({ id: "secrets", label: t(retainCredentials ? 'wizard.variables' : 'wizard.secrets'), status: "pending" });
-    steps.push({ id: "dispatch", label: t('wizard.run'), status: "pending" });
-    steps.push({ id: "workflow", label: t('wizard.workflow'), status: "pending" });
+    steps.push({ id: "fork", status: "pending" });
+    steps.push({ id: "secrets", status: "pending" });
+    steps.push({ id: "dispatch", status: "pending" });
+    steps.push({ id: "workflow", status: "pending" });
 
     setQuickSteps(steps);
     setStatus("running");
