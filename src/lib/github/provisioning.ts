@@ -125,6 +125,8 @@ export async function provisionDnsConfRepository({
     workflow_id: workflowFileName
   });
 
+  const previousRunId = await fetchLatestRunId(request, owner, repo, workflowFileName);
+
   await request("POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches", {
     owner,
     repo,
@@ -132,7 +134,13 @@ export async function provisionDnsConfRepository({
     ref: "main"
   });
 
-  const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(request, owner, repo, workflowFileName);
+  const { workflowRunUrl, workflowRunId } = await fetchWorkflowRun(
+    request,
+    owner,
+    repo,
+    workflowFileName,
+    previousRunId
+  );
   if (workflowRunUrl) {
     await onWorkflowRun?.({ repository: { owner, repo }, workflowRunUrl, workflowRunId });
   }
@@ -368,11 +376,30 @@ async function syncVariable(
 const DISPATCH_POLL_RETRIES = 10;
 const DISPATCH_POLL_INTERVAL_MS = 2000;
 
-async function fetchWorkflowRun(
+async function fetchLatestRunId(
   request: GitHubRequest,
   owner: string,
   repo: string,
   workflowFileName: string
+): Promise<number | undefined> {
+  try {
+    const response = await request(
+      "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
+      { owner, repo, workflow_id: workflowFileName, per_page: 1 }
+    );
+    const data = response.data as { workflow_runs?: Array<{ id: number }> };
+    return data.workflow_runs?.[0]?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchWorkflowRun(
+  request: GitHubRequest,
+  owner: string,
+  repo: string,
+  workflowFileName: string,
+  previousRunId?: number
 ): Promise<{ workflowRunUrl?: string; workflowRunId?: number }> {
   for (let i = 0; i < DISPATCH_POLL_RETRIES; i++) {
     try {
@@ -382,7 +409,8 @@ async function fetchWorkflowRun(
       );
       const data = response.data as { workflow_runs?: Array<{ id: number; html_url?: string }> };
       const run = data.workflow_runs?.[0];
-      if (run?.html_url) {
+      // the dispatched run may not exist yet, so an older run must not be picked up
+      if (run?.html_url && run.id !== previousRunId) {
         return { workflowRunUrl: run.html_url, workflowRunId: run.id };
       }
     } catch {
