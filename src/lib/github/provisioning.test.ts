@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { GEOHIDE_HOSTS_LIST } from "@/domain/toggles";
 import { loadExistingDnsConfSetup, provisionDnsConfRepository, starRepository } from "./provisioning";
 
+type RequestMock = { mock: { calls: unknown[][] } };
+
+// the dispatched run appears in the list only after the dispatch call
+function hasDispatched(request: RequestMock): boolean {
+  return request.mock.calls.some((call) => String(call[0]).includes("/dispatches"));
+}
+
 describe("provisionDnsConfRepository", () => {
   it("forks DnsConf, uploads encrypted secrets, upserts variables, and dispatches the workflow", async () => {
     let forkExists = false;
@@ -26,7 +33,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -111,7 +118,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 7, html_url: "https://example.test/run/7" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 7, html_url: "https://example.test/run/7" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return runCompletion;
@@ -165,7 +172,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -209,7 +216,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 11, html_url: "https://github.com/noVibe/DnsConf/actions/runs/11" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 11, html_url: "https://github.com/noVibe/DnsConf/actions/runs/11" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -290,7 +297,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -348,7 +355,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://github.com/alice/DnsConf/actions/runs/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -394,7 +401,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 9, html_url: "https://example.test/run/9" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 9, html_url: "https://example.test/run/9" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "failure" } };
@@ -424,7 +431,7 @@ describe("provisionDnsConfRepository", () => {
         return { data: { key: "public-key", key_id: "key-id" } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://example.test/run/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://example.test/run/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -476,7 +483,7 @@ describe("provisionDnsConfRepository", () => {
         throw Object.assign(new Error("Variable not found"), { status: 404 });
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 1, html_url: "https://example.test/run/1" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 1, html_url: "https://example.test/run/1" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -534,7 +541,7 @@ describe("provisionDnsConfRepository", () => {
         throw Object.assign(new Error("Variable already exists"), { status: 409 });
       }
       if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
-        return { data: { workflow_runs: [{ id: 7, html_url: "https://example.test/run/7" }] } };
+        return { data: { workflow_runs: hasDispatched(request) ? [{ id: 7, html_url: "https://example.test/run/7" }] : [] } };
       }
       if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
         return { data: { status: "completed", conclusion: "success" } };
@@ -731,6 +738,57 @@ describe("repository helpers", () => {
     expect(request).toHaveBeenCalledWith("PUT /user/starred/{owner}/{repo}", {
       owner: "noVibe",
       repo: "DnsConf",
+    });
+  });
+});
+
+describe("dispatched workflow run", () => {
+  it("waits for the dispatched run instead of reporting the previous one", async () => {
+    let runListCallsAfterDispatch = 0;
+    const request = vi.fn(async (route: string) => {
+      if (route === "GET /user") {
+        return { data: { login: "alice" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/secrets/public-key") {
+        return { data: { key: "public-key", key_id: "key-id" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        const previousRun = { id: 5, html_url: "https://example.test/run/5" };
+        const dispatchedRun = { id: 6, html_url: "https://example.test/run/6" };
+        if (!hasDispatched(request)) {
+          return { data: { workflow_runs: [previousRun] } };
+        }
+        // GitHub needs a moment to create the run, until then the previous one is still the latest
+        runListCallsAfterDispatch++;
+        return { data: { workflow_runs: [runListCallsAfterDispatch > 1 ? dispatchedRun : previousRun] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/runs/{run_id}") {
+        return { data: { status: "completed", conclusion: "success" } };
+      }
+      return { data: {} };
+    });
+
+    const result = await provisionDnsConfRepository({
+      sourceOwner: "noVibe",
+      sourceRepo: "DnsConf",
+      workflowFileName: "github_action.yml",
+      payload: {
+        secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "https://example.com/hosts", EXCLUDE_REDIRECT: "" }
+      },
+      request,
+      encryptSecret: async (value: string) => `encrypted:${value}`
+    });
+
+    expect(result.workflowRunId).toBe(6);
+    expect(result.workflowRunUrl).toBe("https://example.test/run/6");
+    expect(request).toHaveBeenCalledWith("GET /repos/{owner}/{repo}/actions/runs/{run_id}", {
+      owner: "alice",
+      repo: "DnsConf",
+      run_id: 6
     });
   });
 });
