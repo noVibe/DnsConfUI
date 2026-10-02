@@ -72,6 +72,9 @@ export const locale = {
   "existing.retainTitle": "Keep saved credentials",
   "existing.retainDesc": "Keep CLIENT_ID and AUTH_SECRET in GitHub and edit only settings that do not require direct provider API access.",
   "existing.noDnsVariable": "The DNS variable is missing or invalid, so profile order cannot be restored safely.",
+  "existing.enableWorkflowTitle": "Turn the updates back on",
+  "existing.enableWorkflowDesc": "GitHub disabled the scheduled run in your fork, which happens after 60 days without repository activity. The rules are not being updated, click to turn it back on.",
+  "existing.enableWorkflowDescWithDate": "GitHub disabled the scheduled run in your fork, which happens after 60 days without repository activity. The rules were last updated on {date}. Click to turn it back on.",
   "existing.returnToRetained": "Back to setup without credentials",
 
   "profiles.title": "Profiles",

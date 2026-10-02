@@ -60,3 +60,25 @@ describe("ExistingSetupChoice", () => {
     expect(props.onRetry).toHaveBeenCalledOnce();
   });
 });
+
+describe("ExistingSetupChoice with a disabled workflow", () => {
+  it("offers to turn the updates back on", () => {
+    const onEnableWorkflow = vi.fn();
+    renderChoice({
+      setup: { ...setup, workflow: { disabled: true, lastRunAt: "2026-07-28T04:41:10Z" } },
+      onEnableWorkflow
+    });
+
+    const button = screen.getByRole("button", { name: /Включить обновление правил/ });
+    expect(screen.getByText(/Последнее обновление правил/)).toBeVisible();
+
+    fireEvent.click(button);
+    expect(onEnableWorkflow).toHaveBeenCalled();
+  });
+
+  it("stays hidden while the workflow is active", () => {
+    renderChoice({ setup: { ...setup, workflow: { disabled: false } } });
+
+    expect(screen.queryByText(/Включить обновление правил/)).toBeNull();
+  });
+});
