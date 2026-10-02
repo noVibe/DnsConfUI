@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { GEOHIDE_HOSTS_LIST } from "@/domain/toggles";
-import { loadExistingDnsConfSetup, provisionDnsConfRepository, starRepository } from "./provisioning";
+import { enableDnsConfWorkflow, loadExistingDnsConfSetup, provisionDnsConfRepository, starRepository } from "./provisioning";
 
 type RequestMock = { mock: { calls: unknown[][] } };
 
@@ -789,6 +789,72 @@ describe("dispatched workflow run", () => {
       owner: "alice",
       repo: "DnsConf",
       run_id: 6
+    });
+  });
+});
+
+describe("disabled workflow", () => {
+  function requestWithWorkflowState(state: string) {
+    return vi.fn(async (route: string) => {
+      if (route === "GET /user") {
+        return { data: { login: "alice" } };
+      }
+      if (route === "GET /repos/{owner}/{repo}") {
+        return { data: { owner: { login: "alice" }, name: "DnsConf", fork: true, parent: { full_name: "noVibe/DnsConf" } } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/variables") {
+        return { data: { variables: [{ name: "DNS", value: "nextdns" }] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/environments") {
+        return { data: { environments: [] } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}") {
+        return { data: { state } };
+      }
+      if (route === "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs") {
+        return { data: { workflow_runs: [{ created_at: "2026-07-28T04:41:10Z" }] } };
+      }
+      return { data: {} };
+    });
+  }
+
+  it("reports a workflow disabled by inactivity with the date of the last run", async () => {
+    const request = requestWithWorkflowState("disabled_inactivity");
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf", "github_action.yml");
+
+    expect(result?.workflow).toEqual({ disabled: true, lastRunAt: "2026-07-28T04:41:10Z" });
+  });
+
+  it("reports an active workflow as not disabled", async () => {
+    const request = requestWithWorkflowState("active");
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf", "github_action.yml");
+
+    expect(result?.workflow?.disabled).toBe(false);
+  });
+
+  it("skips the workflow check when no workflow file is given", async () => {
+    const request = requestWithWorkflowState("disabled_inactivity");
+
+    const result = await loadExistingDnsConfSetup(request, "noVibe", "DnsConf");
+
+    expect(result?.workflow).toBeUndefined();
+    expect(request).not.toHaveBeenCalledWith(
+      "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}",
+      expect.anything()
+    );
+  });
+
+  it("enables the workflow", async () => {
+    const request = vi.fn(async () => ({ data: {} }));
+
+    await enableDnsConfWorkflow(request, "alice", "DnsConf", "github_action.yml");
+
+    expect(request).toHaveBeenCalledWith("PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable", {
+      owner: "alice",
+      repo: "DnsConf",
+      workflow_id: "github_action.yml"
     });
   });
 });

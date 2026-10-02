@@ -36,11 +36,17 @@ export type ProvisionResult = {
   workflowRunId?: number;
 };
 
+export type WorkflowStatus = {
+  disabled: boolean;
+  lastRunAt?: string;
+};
+
 export type ExistingDnsConfSetup = {
   repository: { owner: string; repo: string };
   variables: DnsConfVariables;
   config: DnsConfConfig | null;
   variableEnvironment?: string;
+  workflow?: WorkflowStatus;
 };
 
 type RepoResponse = {
@@ -158,7 +164,8 @@ export async function provisionDnsConfRepository({
 export async function loadExistingDnsConfSetup(
   request: GitHubRequest,
   sourceOwner: string,
-  sourceRepo: string
+  sourceRepo: string,
+  workflowFileName?: string
 ): Promise<ExistingDnsConfSetup | null> {
   const user = await getAuthenticatedUser(request);
   const repository = await findExistingRepository(request, user, sourceOwner, sourceRepo);
@@ -184,8 +191,68 @@ export async function loadExistingDnsConfSetup(
     repository: { owner: repository.owner, repo: repository.repo },
     variables,
     config: configFromDnsConfVariables(variables),
-    variableEnvironment
+    variableEnvironment,
+    workflow: workflowFileName
+      ? await loadWorkflowStatus(request, repository.owner, repository.repo, workflowFileName)
+      : undefined
   };
+}
+
+/**
+ * GitHub disables a scheduled workflow after 60 days without repository activity,
+ * so a fork stops updating the rules on its own.
+ */
+async function loadWorkflowStatus(
+  request: GitHubRequest,
+  owner: string,
+  repo: string,
+  workflowFileName: string
+): Promise<WorkflowStatus | undefined> {
+  try {
+    const response = await request("GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}", {
+      owner,
+      repo,
+      workflow_id: workflowFileName
+    });
+    const { state } = response.data as { state?: string };
+    return {
+      disabled: Boolean(state) && state !== "active",
+      lastRunAt: await loadLastRunDate(request, owner, repo, workflowFileName)
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+async function loadLastRunDate(
+  request: GitHubRequest,
+  owner: string,
+  repo: string,
+  workflowFileName: string
+): Promise<string | undefined> {
+  try {
+    const response = await request(
+      "GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
+      { owner, repo, workflow_id: workflowFileName, per_page: 1 }
+    );
+    const data = response.data as { workflow_runs?: Array<{ created_at?: string }> };
+    return data.workflow_runs?.[0]?.created_at;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function enableDnsConfWorkflow(
+  request: GitHubRequest,
+  owner: string,
+  repo: string,
+  workflowFileName: string
+): Promise<void> {
+  await request("PUT /repos/{owner}/{repo}/actions/workflows/{workflow_id}/enable", {
+    owner,
+    repo,
+    workflow_id: workflowFileName
+  });
 }
 
 function applyDnsConfVariables(

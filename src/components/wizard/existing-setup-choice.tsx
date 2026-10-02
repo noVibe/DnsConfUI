@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { KeyRound, Loader2, PlayCircle, RefreshCw, RotateCcw } from "lucide-react";
 import type { ExistingDnsConfSetup } from "@/lib/github/provisioning";
 import { useLocale } from "@/lib/i18n/context";
 import { Button, SecondaryButton } from "@/components/ui";
@@ -9,16 +9,20 @@ export function ExistingSetupChoice({
   loading,
   error,
   setup,
+  enablingWorkflow,
   onRetry,
   onConfigureFromScratch,
-  onRetainCredentials
+  onRetainCredentials,
+  onEnableWorkflow
 }: {
   loading: boolean;
   error: string;
   setup: ExistingDnsConfSetup | null;
+  enablingWorkflow?: boolean;
   onRetry: () => void;
   onConfigureFromScratch: () => void;
   onRetainCredentials: () => void;
+  onEnableWorkflow?: () => void;
 }) {
   const { t } = useLocale();
 
@@ -88,6 +92,27 @@ export function ExistingSetupChoice({
             {setup.config ? t("existing.retainDesc") : t("existing.noDnsVariable")}
           </p>
         </button>
+
+        {setup.workflow?.disabled && (
+          <button
+            type="button"
+            onClick={onEnableWorkflow}
+            disabled={enablingWorkflow}
+            className="rounded-lg border border-coral/40 bg-coral/10 p-4 text-left transition hover:border-coral disabled:cursor-not-allowed disabled:opacity-55 sm:col-span-2"
+          >
+            {enablingWorkflow
+              ? <Loader2 className="size-5 animate-spin text-coral" aria-hidden="true" />
+              : <PlayCircle className="size-5 text-coral" aria-hidden="true" />}
+            <div className="mt-3 font-semibold text-ink">{t("existing.enableWorkflowTitle")}</div>
+            <p className="mt-3 rounded-md border border-line/70 bg-white/50 px-3 py-2 text-sm leading-6 text-ink/65">
+              {setup.workflow.lastRunAt
+                ? t("existing.enableWorkflowDescWithDate", {
+                    date: new Date(setup.workflow.lastRunAt).toLocaleDateString()
+                  })
+                : t("existing.enableWorkflowDesc")}
+            </p>
+          </button>
+        )}
       </div>
     </section>
   );

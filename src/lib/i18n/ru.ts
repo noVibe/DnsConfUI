@@ -74,6 +74,9 @@ export const locale: Record<LocaleKey, string> = {
   "existing.retainTitle": "Сохранить учётные данные",
   "existing.retainDesc": "Оставить CLIENT_ID и AUTH_SECRET в GitHub и изменить только настройки, которым не нужен прямой доступ к API провайдера.",
   "existing.noDnsVariable": "Переменная DNS отсутствует или содержит ошибку, поэтому безопасно восстановить порядок профилей нельзя.",
+  "existing.enableWorkflowTitle": "Включить обновление правил",
+  "existing.enableWorkflowDesc": "GitHub отключил автозапуск в вашем форке: он выключается, если в репозитории 60 дней не было активности. Правила перестали обновляться, нажмите, чтобы включить обратно.",
+  "existing.enableWorkflowDescWithDate": "GitHub отключил автозапуск в вашем форке: он выключается, если в репозитории 60 дней не было активности. Последнее обновление правил — {date}. Нажмите, чтобы включить обратно.",
   "existing.returnToRetained": "Обратно к настройке без учётных данных",
 
   "profiles.title": "Профили",

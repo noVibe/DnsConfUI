@@ -15,6 +15,7 @@ import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import {
   createGitHubRequest,
+  enableDnsConfWorkflow,
   loadExistingDnsConfSetup,
   provisionDnsConfRepository,
   starRepository,
@@ -52,6 +53,7 @@ export function SetupWizard() {
   const [nativeTracking, setNativeTracking] = useState(true);
   const [setupPath, setSetupPath] = useState<"checking" | "choice" | "fresh" | "retained">("checking");
   const [existingSetup, setExistingSetup] = useState<ExistingDnsConfSetup | null>(null);
+  const [enablingWorkflow, setEnablingWorkflow] = useState(false);
   const [setupCheckError, setSetupCheckError] = useState("");
   const [setupCheckVersion, setSetupCheckVersion] = useState(0);
   const [canReturnToRetainedSetup, setCanReturnToRetainedSetup] = useState(false);
@@ -98,7 +100,12 @@ export function SetupWizard() {
     setSetupPath("checking");
     setSetupCheckError("");
 
-    loadExistingDnsConfSetup(createGitHubRequest(token), dnsConfWorkflow.sourceOwner, dnsConfWorkflow.sourceRepo)
+    loadExistingDnsConfSetup(
+      createGitHubRequest(token),
+      dnsConfWorkflow.sourceOwner,
+      dnsConfWorkflow.sourceRepo,
+      dnsConfWorkflow.workflowFileName
+    )
       .then((setup) => {
         if (cancelled) return;
         setExistingSetup(setup);
@@ -114,6 +121,24 @@ export function SetupWizard() {
       cancelled = true;
     };
   }, [token, setupCheckVersion]);
+
+  async function enableWorkflow() {
+    if (!token || !existingSetup) return;
+    setEnablingWorkflow(true);
+    try {
+      await enableDnsConfWorkflow(
+        createGitHubRequest(token),
+        existingSetup.repository.owner,
+        existingSetup.repository.repo,
+        dnsConfWorkflow.workflowFileName
+      );
+      setSetupCheckVersion((version) => version + 1);
+    } catch (error) {
+      setSetupCheckError(error instanceof Error ? error.message : t("wizard.ghProvisionFailed"));
+    } finally {
+      setEnablingWorkflow(false);
+    }
+  }
 
   function configureFromScratch() {
     setCanReturnToRetainedSetup(false);
@@ -424,6 +449,8 @@ export function SetupWizard() {
         onRetry={() => setSetupCheckVersion((version) => version + 1)}
         onConfigureFromScratch={configureFromScratch}
         onRetainCredentials={configureWithRetainedCredentials}
+        enablingWorkflow={enablingWorkflow}
+        onEnableWorkflow={enableWorkflow}
       />
     );
   }
