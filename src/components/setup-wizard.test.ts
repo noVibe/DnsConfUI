@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
-import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
+import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_LIST } from "@/domain/toggles";
 import { buildQuickDnsConfConfig, parseExcludeDomains } from "./setup-wizard";
 
 describe("parseExcludeDomains", () => {
@@ -57,7 +57,7 @@ describe("buildQuickDnsConfConfig", () => {
   it("preserves custom sources while updating managed quick-mode sources", () => {
     const config = buildQuickDnsConfConfig({
       profiles: [{ clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }],
-      existingBlocklists: ["https://custom.test/block", OISD_SMALL_BLOCK_DOMAINS],
+      existingBlocklists: ["https://custom.test/block", OISD_SMALL_BLOCK_LIST],
       existingRedirects: ["https://custom.test/redirect", GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST],
       existingRedirectExclusions: ["keep.example"],
       geoBlock: true,
@@ -75,7 +75,7 @@ describe("buildQuickDnsConfConfig", () => {
   it("does not alter NextDNS block sources when direct API settings are locked", () => {
     const config = buildQuickDnsConfConfig({
       profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
-      existingBlocklists: [OISD_SMALL_BLOCK_DOMAINS],
+      existingBlocklists: [OISD_SMALL_BLOCK_LIST],
       existingRedirects: [],
       existingRedirectExclusions: [],
       geoBlock: false,
@@ -85,7 +85,23 @@ describe("buildQuickDnsConfConfig", () => {
       retainCredentials: true
     });
 
-    expect(config.blocklists).toEqual([OISD_SMALL_BLOCK_DOMAINS]);
+    expect(config.blocklists).toEqual([OISD_SMALL_BLOCK_LIST]);
+  });
+
+  it("blocks ads with the plain list only", () => {
+    const config = buildQuickDnsConfConfig({
+      profiles: [{ clientId: "", authSecret: "", provider: "cloudflare", donorDns: DEFAULT_DNS_DONOR }],
+      existingBlocklists: [],
+      existingRedirects: [],
+      existingRedirectExclusions: [],
+      geoBlock: false,
+      geoHideChecked: false,
+      malwChecked: false,
+      blockAds: true,
+      retainCredentials: false
+    });
+
+    expect(config.blocklists).toEqual([OISD_SMALL_BLOCK_LIST]);
   });
 
   it("removes every redirect source when geo-blocking is disabled", () => {
