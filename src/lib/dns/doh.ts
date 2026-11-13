@@ -23,7 +23,7 @@ export function isPublicAddress(ip: string): boolean {
 }
 
 // Checked in the lookup the connection itself uses, so a hostname cannot pass a check and then resolve elsewhere.
-const publicLookup = ((hostname, options, callback) => {
+export const publicLookup = ((hostname, options, callback) => {
   dns.lookup(hostname, options, (error, address, family) => {
     if (error) return callback(error, address, family);
     const addresses = Array.isArray(address) ? address.map((entry) => entry.address) : [address];
