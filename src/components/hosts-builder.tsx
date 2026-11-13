@@ -28,6 +28,17 @@ import { DonorSelect } from "@/components/wizard/donor-select";
 const BATCH_SIZE = 50;
 /** The route answers 429 beyond 10 concurrent batches; two keeps the walk overlapping without ever going near that. */
 const MAX_IN_FLIGHT = 2;
+/**
+ * How many batches the sweep keeps in flight.
+ *
+ * The sweep is not paced by the same thing as the main pass. It asks each leftover hostname only the donors the
+ * narrowed pair did not use, and those are by construction the donors that ranked last for failing to answer — so
+ * nearly all of its wall time is spent waiting out the 5s DNS timeout rather than doing work. A measured run had
+ * the main pass cover 1040 domains in 158s and the sweep spend 164s on the 213 left over. Waiting on more of those
+ * timeouts at the same time is the only thing that shortens them, and it buys no extra work for the resolver to do.
+ * Five still leaves half of the route's ten-batch ceiling free for the ping table's own checks.
+ */
+const SWEEP_IN_FLIGHT = 5;
 /** More donors than this only lengthen the per-hostname walk the server does on a miss. */
 const MAX_DONORS = 4;
 /**
@@ -368,16 +379,16 @@ export function HostsBuilder() {
       return index < DISCOVERY_BATCHES ? ranked : ranked.slice(0, NARROWED_DONORS);
     };
 
-    /** Runs a list of jobs `MAX_IN_FLIGHT` at a time, each with the donors it is due at the moment it goes out. */
-    const pump = async (jobs: readonly Job[]) => {
+    /** Runs a list of jobs `inFlight` at a time, each with the donors it is due at the moment it goes out. */
+    const pump = async (jobs: readonly Job[], inFlight: number) => {
       let next = 0;
       const worker = async () => {
         while (next < jobs.length) {
           const index = next++;
           const job = jobs[index];
           // Both the cursor and the donors are read in this one synchronous step, before the next await: whatever
-          // the batches that have already answered taught is in the tally by now, so the two workers sharing the
-          // cursor always dispatch with the current narrowed pair, and a change of pair reaches every later batch.
+          // the batches that have already answered taught is in the tally by now, so the workers sharing the cursor
+          // always dispatch with the current narrowed pair, and a change of pair reaches every later batch.
           const order = job.donors ?? donorsForBatch(index);
           const results = await resolveBatch(job.hostnames, order, controller.signal);
           // Recorded before the rows are read, so a hostname the server left out of its answer is still owed the
@@ -408,7 +419,7 @@ export function HostsBuilder() {
           setDonorCounts([...answered]);
         }
       };
-      await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, jobs.length) }, worker));
+      await Promise.all(Array.from({ length: Math.min(inFlight, jobs.length) }, worker));
     };
 
     /**
@@ -438,11 +449,12 @@ export function HostsBuilder() {
     };
 
     try {
-      await pump(chunk(names, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: null, fresh: true })));
+      const main = chunk(names, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: null, fresh: true }));
+      await pump(main, MAX_IN_FLIGHT);
       const sweep = sweepJobs();
       if (sweep.length > 0) {
         setPhase("sweeping");
-        await pump(sweep);
+        await pump(sweep, SWEEP_IN_FLIGHT);
       }
     } catch {
       setCancelled(true);
