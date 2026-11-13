@@ -50,7 +50,7 @@ describe("DonorSelect", () => {
   });
 
   it("runs the checks again every time the list opens, but not while they are still running", async () => {
-    checkDonor.mockResolvedValue({ dnsMs: 50, chatgptMs: 40, country: "DE", direct: false, ips: [] });
+    checkDonor.mockResolvedValue({ dnsMs: 50, chatgptMs: 40, country: "DE", direct: false });
     const { combobox } = renderSelect();
     expect(checkDonor).toHaveBeenCalledTimes(DNS_DONORS.length);
 

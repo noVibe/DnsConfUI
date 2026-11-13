@@ -25,11 +25,10 @@ const requestSchema = z.object({ donor: z.string().refine(isCheckableDonor) });
  * Elapsed milliseconds for each passed check (null when failed) and the exit country chatgpt.com saw.
  * `direct` means the DNS does not proxy chatgpt.com: the connection leaves from wherever the user is, so the
  * country is left to the browser to fill in instead of reporting this server's own location.
- * `ips` are the chatgpt.com addresses that were tried, so the user can test the same ones from their network.
  */
-type CheckResult = { dnsMs: number | null; chatgptMs: number | null; country: string | null; direct: boolean; ips: string[] };
+type CheckResult = { dnsMs: number | null; chatgptMs: number | null; country: string | null; direct: boolean };
 
-const FAILED: CheckResult = { dnsMs: null, chatgptMs: null, country: null, direct: false, ips: [] };
+const FAILED: CheckResult = { dnsMs: null, chatgptMs: null, country: null, direct: false };
 const EXIT_IP_TTL_MS = 5 * 60_000;
 
 // Concurrent requests for a donor share one check, so repeated calls cannot multiply outbound connections.
@@ -76,11 +75,11 @@ async function check(donor: string): Promise<CheckResult> {
   })).catch(() => null);
   if (passed) {
     const direct = isDirect(passed);
-    return { dnsMs, chatgptMs: passed.ms, country: direct ? null : passed.country, direct, ips: candidates };
+    return { dnsMs, chatgptMs: passed.ms, country: direct ? null : passed.country, direct };
   }
 
   const answered = (await Promise.all(traces)).find(Boolean);
-  return { ...FAILED, dnsMs, country: answered?.country ?? null, ips: candidates };
+  return { ...FAILED, dnsMs, country: answered?.country ?? null };
 }
 
 export async function POST(request: Request) {

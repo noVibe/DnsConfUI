@@ -49,7 +49,7 @@ describe("POST /api/donors/check", () => {
 
     const response = await POST(checkRequest({ donor: "https://dns.magicdns.ru/dns-query" }));
 
-    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: 42, country: "NL", direct: false, ips: ["1.1.1.1", "2.2.2.2"] });
+    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: 42, country: "NL", direct: false });
     expect(dohMocks.resolveA).toHaveBeenCalledWith("https://dns.magicdns.ru/dns-query", "chatgpt.com", 5000);
     expect(dohMocks.traceCountry).toHaveBeenCalledWith("2.2.2.2", "chatgpt.com", 5000);
   });
@@ -69,7 +69,7 @@ describe("POST /api/donors/check", () => {
 
     const response = await POST(checkRequest({ donor: "https://geohide.ru/dns-query" }));
 
-    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: 50, country: "DE", direct: false, ips: ["1.1.1.1", "2.2.2.2"] });
+    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: 50, country: "DE", direct: false });
   });
 
   it("fails the chatgpt.com check when no address answers", async () => {
@@ -78,7 +78,7 @@ describe("POST /api/donors/check", () => {
 
     const response = await POST(checkRequest({ donor: "https://dns.zapret.moe/dns-query" }));
 
-    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: null, country: null, direct: false, ips: ["1.1.1.1"] });
+    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: null, country: null, direct: false });
   });
 
   it("fails both checks when the donor does not resolve", async () => {
@@ -86,7 +86,7 @@ describe("POST /api/donors/check", () => {
 
     const response = await POST(checkRequest({ donor: "https://dns.dagami.ru/dns-query" }));
 
-    expect(await response.json()).toEqual({ dnsMs: null, chatgptMs: null, country: null, direct: false, ips: [] });
+    expect(await response.json()).toEqual({ dnsMs: null, chatgptMs: null, country: null, direct: false });
     expect(dohMocks.traceCountry).not.toHaveBeenCalledWith(expect.anything(), "chatgpt.com", expect.anything());
   });
 

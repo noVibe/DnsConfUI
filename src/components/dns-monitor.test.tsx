@@ -20,66 +20,9 @@ function renderMonitor() {
 describe("DnsMonitor", () => {
   beforeEach(() => {
     checkDonor.mockReset();
-    checkDonor.mockResolvedValue({ dnsMs: 90, chatgptMs: 300, country: "NL", direct: false, ips: ["203.0.113.10", "203.0.113.11"] });
+    checkDonor.mockResolvedValue({ dnsMs: 90, chatgptMs: 300, country: "NL", direct: false });
     visitorCountry.mockReset();
     visitorCountry.mockResolvedValue("UZ");
-    window.location.hash = "";
-  });
-
-  it("offers a command that tests every checked proxy IP from the user's computer", async () => {
-    renderMonitor();
-    await screen.findAllByText("DNS: отвечает, 90 мс");
-
-    fireEvent.click(screen.getByText("Проверить с вашего компьютера"));
-    fireEvent.click(screen.getByRole("button", { name: "macOS и Linux" }));
-
-    const command = (await screen.findByText(/--resolve/)).textContent ?? "";
-    expect(command).toContain(`for t in ${DNS_DONORS.map((_, index) => `${index}:203.0.113.10 ${index}:203.0.113.11`).join(" ")};`);
-    expect(command).toContain(`u="${window.location.origin}/#at=$(date +%s)&local=\${r%,}"`);
-    fireEvent.click(screen.getByRole("button", { name: "Windows" }));
-    expect(screen.getByText(/curl\.exe/)).toBeInTheDocument();
-  });
-
-  it("shows the results the command brought back in the URL fragment", async () => {
-    window.location.hash = `#at=${Math.floor(Date.now() / 1000) - 300}&local=0:DE:0.4,1:RU:0.5,2:x`;
-    renderMonitor();
-
-    expect(await screen.findByRole("columnheader", { name: /У вас/ })).toBeInTheDocument();
-    expect(screen.getByText("У вас: открывается через DE, 400 мс")).toBeInTheDocument();
-    expect(screen.getByText("У вас: подключение через RU, ChatGPT там не работает")).toBeInTheDocument();
-    expect(screen.getByText("У вас: не открывается")).toBeInTheDocument();
-    expect(screen.getAllByText("У вас: не проверялось")).toHaveLength(DNS_DONORS.length - 3);
-    expect(screen.getByRole("columnheader", { name: /У вас.*5 мин\. назад/ })).toBeInTheDocument();
-  });
-
-  it("marks a DNS that gave no address as failed in the local column", async () => {
-    checkDonor.mockImplementation(async (donor: string) => (donor === DNS_DONORS[1].value
-      ? { dnsMs: null, chatgptMs: null, country: null, direct: false, ips: [] }
-      : { dnsMs: 90, chatgptMs: 300, country: "NL", direct: false, ips: ["203.0.113.10"] }));
-    window.location.hash = "#local=0:DE:0.4";
-    renderMonitor();
-
-    const row = await screen.findByRole("row", { name: new RegExp(DNS_DONORS[1].label) });
-    expect(await within(row).findByText("У вас: не проверялось — DNS не ответил")).toBeInTheDocument();
-  });
-
-  it("reads results from a link pasted into a tab that already shows the page", async () => {
-    renderMonitor();
-    expect(screen.queryByRole("columnheader", { name: /У вас/ })).not.toBeInTheDocument();
-
-    window.location.hash = "#local=0:NL:0.2";
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-
-    expect(await screen.findByText("У вас: открывается через NL, 200 мс")).toBeInTheDocument();
-  });
-
-  it("restores the custom DoH that the command tested", async () => {
-    window.location.hash = `#doh=${encodeURIComponent("https://dns.example/dns-query")}&local=c:NL:0.3`;
-    renderMonitor();
-
-    expect(checkDonor).toHaveBeenCalledWith("https://dns.example/dns-query");
-    const row = await screen.findByRole("row", { name: /dns\.example/ });
-    expect(within(row).getByText("У вас: открывается через NL, 300 мс")).toBeInTheDocument();
   });
 
   it.each([

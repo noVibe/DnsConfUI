@@ -73,7 +73,6 @@ export function useDonorChecks() {
       chatgpt,
       country,
       direct,
-      ips: check?.ips ?? [],
       dnsMs: check?.dnsMs ?? null,
       chatgptMs: chatgptMs ?? null,
       dnsText: t(dnsKey[dns], { ms: check?.dnsMs ?? 0 }),
@@ -119,14 +118,14 @@ export function DnsCheck({ status }: { status: DonorStatus }) {
   );
 }
 
-export function ChatgptCheck({ status, className, compact = false }: { status: DonorStatus; className?: string; compact?: boolean }) {
+export function ChatgptCheck({ status, className }: { status: DonorStatus; className?: string }) {
   const { t } = useLocale();
   return (
     <span className={cn("flex items-center gap-1", className)}>
       <span className="sr-only">{status.chatgptText}</span>
       {/* Fixed slots keep the country codes lined up in one column across rows. */}
       <Detail className={cn("w-5 text-center font-medium", status.chatgpt === "fail" ? "text-coral" : "text-ink/60")}>{status.country}</Detail>
-      <Detail className={cn("min-w-[2.75rem] text-right", compact && "hidden sm:inline")}>
+      <Detail className="min-w-[2.75rem] text-right">
         {status.chatgptMs !== null ? t("profiles.donorCheckMs", { ms: status.chatgptMs }) : null}
       </Detail>
       <StatusIcon status={status.chatgpt} label={status.chatgptText} />
