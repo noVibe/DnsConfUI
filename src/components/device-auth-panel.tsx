@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, Copy, GitBranch, KeyRound, Loader2 } from "lucide-react";
+import { Check, Copy, GitBranch, Info, KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { getGitHubClientId, isUsingBuiltInGitHubClientId } from "@/domain/github-app";
 import { requestGitHubDeviceCode, pollGitHubDeviceToken, type DeviceCodeResponse } from "@/lib/github/device-flow";
 import { useAuth } from "./auth-provider";
 import { useLocale } from "@/lib/i18n/context";
@@ -16,7 +17,12 @@ export function DeviceAuthPanel() {
   const [state, setState] = useState<AuthState>("idle");
   const [message, setMessage] = useState<string>("");
   const pollingRef = useRef<number | null>(null);
-  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = getGitHubClientId();
+  const usesSharedGitHubApp = isUsingBuiltInGitHubClientId();
+  // The shared-app warning has to be acknowledged before the device flow can
+  // be started, so authorization cannot begin by accident.
+  const [sharedAppAccepted, setSharedAppAccepted] = useState(false);
+  const sharedAppWarningPending = usesSharedGitHubApp && !sharedAppAccepted;
 
   useEffect(() => {
     return () => {
@@ -29,6 +35,10 @@ export function DeviceAuthPanel() {
   const [copied, setCopied] = useState(false);
 
   async function start() {
+    if (sharedAppWarningPending) {
+      return;
+    }
+
     if (!gitHubClientId) {
       setState("error");
       setMessage(t('auth.clientIdRequired'));
@@ -130,6 +140,23 @@ export function DeviceAuthPanel() {
               <GitBranch className="size-4" aria-hidden="true" />
               {t('auth.openGhDev')}
             </a>
+          </div>
+        ) : sharedAppWarningPending ? (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 size-5 shrink-0 text-coral" aria-hidden="true" />
+              <div className="text-base font-semibold text-ink">{t('auth.sharedAppTitle')}</div>
+            </div>
+            <div className="space-y-3 rounded-md border border-coral/30 bg-coral/10 p-3">
+              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppOwner')}</p>
+              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppRateLimit')}</p>
+              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppOwnApp')}</p>
+              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppToken')}</p>
+            </div>
+            <Button className="w-full" onClick={() => setSharedAppAccepted(true)}>
+              <GitBranch className="size-4" aria-hidden="true" />
+              {t('auth.sharedAppContinue')}
+            </Button>
           </div>
         ) : device ? (
           <div className="space-y-4">

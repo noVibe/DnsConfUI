@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { getGitHubClientId } from "@/domain/github-app";
 
 export async function POST() {
-  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = getGitHubClientId();
 
   if (!gitHubClientId) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });

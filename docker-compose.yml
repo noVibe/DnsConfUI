@@ -1,11 +1,13 @@
 # ---------------------------------------------------------------------------
 # DnsConf UI — local deployment
 #
-#   1. copy .env.example to .env
-#   2. put your GitHub OAuth Client ID into .env
-#   3. docker compose up --build
+#   docker compose up --build
 #
 # Then open http://localhost:3000
+#
+# No .env file is needed: without one the app signs you in through the
+# project's own GitHub OAuth App. Copy .env.example to .env and set
+# NEXT_PUBLIC_GITHUB_CLIENT_ID there to use an OAuth App of your own instead.
 # ---------------------------------------------------------------------------
 
 services:
@@ -14,16 +16,18 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Read from the .env file next to this file. Docker Compose stops with
-        # the message below if the value is missing.
-        NEXT_PUBLIC_GITHUB_CLIENT_ID: '${NEXT_PUBLIC_GITHUB_CLIENT_ID:?Missing NEXT_PUBLIC_GITHUB_CLIENT_ID. Copy .env.example to .env and put your GitHub OAuth App Client ID there - see DOCKER.md}'
+        # Read from the .env file next to this file — optional. When it is
+        # empty or absent, the app falls back to the client ID built into the
+        # source (see src/domain/github-app.ts).
+        NEXT_PUBLIC_GITHUB_CLIENT_ID: '${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}'
 
     image: dnsconf-ui:local
     container_name: dnsconf-ui
 
-    # The server routes read the Client ID at runtime as well.
+    # The server routes read the Client ID at runtime as well; empty here
+    # means the built-in one is used.
     environment:
-      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID}
+      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0

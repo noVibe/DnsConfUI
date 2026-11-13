@@ -211,6 +211,12 @@ export const locale: Record<LocaleKey, string> = {
   "auth.permissions": "Вы предоставите права repo, workflow и read:user, чтобы браузер мог начать взаимодействие с GitHub.",
   "auth.start": "Начать подключение к GitHub",
   "auth.restart": "Перезапустить авторизацию",
+  "auth.sharedAppTitle": "Эта сборка использует общее GitHub-приложение проекта",
+  "auth.sharedAppOwner": "Авторизация идёт через GitHub OAuth App этого проекта, поэтому на странице подтверждения GitHub будет показано имя владельца проекта, а не вашего собственного приложения.",
+  "auth.sharedAppRateLimit": "GitHub ограничивает отправку кодов подтверждения до 50 в час суммарно для всех пользователей одного приложения, поэтому при нагрузке вход может временно не удаваться. В этом случае повторите попытку позже или используйте своё приложение.",
+  "auth.sharedAppOwnApp": "Чтобы использовать своё приложение: создайте OAuth App на https://github.com/settings/developers, поставьте галочку «Enable Device Flow», укажите его client ID в NEXT_PUBLIC_GITHUB_CLIENT_ID в файле .env и перезапустите командой docker compose up --build -d. Пересборка обязательна, потому что Next.js вшивает это значение в браузерный бандл.",
+  "auth.sharedAppToken": "В любом случае приложение по-прежнему не видит и не сохраняет ваш GitHub-токен — он существует только в этой вкладке браузера.",
+  "auth.sharedAppContinue": "Всё равно продолжить",
 
   "validation.clientIdRequired": "Требуется ID клиента",
   "validation.authSecretRequired": "Требуется ключ API провайдера",

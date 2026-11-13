@@ -4,8 +4,8 @@ rem  DnsConf UI - one-click start for Windows.
 rem
 rem  Just double-click this file.
 rem
-rem  It creates .env on first run, asks for your GitHub Client ID if it is
-rem  still empty, then builds and starts the app with Docker.
+rem  It creates .env on first run, then builds and starts the app with
+rem  Docker. Nothing has to be filled in: a GitHub Client ID is optional.
 rem ---------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -46,34 +46,20 @@ if not exist ".env" (
   echo Created .env from .env.example
 )
 
-rem --- 3. make sure the Client ID is filled in -------------------------------
+rem --- 3. the Client ID is optional ------------------------------------------
 set "CLIENT_ID="
 for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"NEXT_PUBLIC_GITHUB_CLIENT_ID=" ".env"`) do set "CLIENT_ID=%%B"
 
 if "!CLIENT_ID!"=="" (
   echo.
-  echo A GitHub OAuth App Client ID is needed ^(one-time setup^):
+  echo No GitHub Client ID in .env - the project's shared GitHub app will be used.
+  echo Nothing else to do. If you would rather use your own OAuth App later:
   echo   1. open https://github.com/settings/developers
   echo   2. New OAuth App  -^>  any name, homepage http://localhost:3000
   echo   3. after creating it, tick "Enable Device Flow" and save
-  echo   4. copy the Client ID and paste it below ^(right-click pastes^)
+  echo   4. put the Client ID into NEXT_PUBLIC_GITHUB_CLIENT_ID in .env
+  echo   5. run this file again
   echo.
-  set /p "CLIENT_ID=Client ID: "
-  set "CLIENT_ID=!CLIENT_ID: =!"
-
-  if "!CLIENT_ID!"=="" (
-    echo.
-    echo No Client ID entered. Put it into .env manually and run this file again.
-    goto :fail
-  )
-
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "$id='!CLIENT_ID!'; $p='.env'; $out = Get-Content $p | ForEach-Object { if ($_ -like 'NEXT_PUBLIC_GITHUB_CLIENT_ID=*') { 'NEXT_PUBLIC_GITHUB_CLIENT_ID=' + $id } else { $_ } }; [IO.File]::WriteAllLines((Resolve-Path $p), $out)"
-  if errorlevel 1 (
-    echo Could not write .env automatically. Open .env in a text editor and
-    echo set NEXT_PUBLIC_GITHUB_CLIENT_ID=!CLIENT_ID!
-    goto :fail
-  )
-  echo Saved to .env
 )
 
 rem --- 4. build and run -------------------------------------------------------

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getGitHubClientId } from "@/domain/github-app";
 
 const tokenRequestSchema = z.object({
   device_code: z.string().min(1)
 });
 
 export async function POST(request: Request) {
-  const gitHubClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  const gitHubClientId = getGitHubClientId();
 
   if (!gitHubClientId) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });

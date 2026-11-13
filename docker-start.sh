@@ -4,8 +4,8 @@
 #
 #   ./docker-start.sh
 #
-# Creates .env on first run, asks for your GitHub Client ID if it is still
-# empty, then builds and starts the app with Docker.
+# Creates .env on first run, then builds and starts the app with Docker.
+# Nothing has to be filled in: a GitHub Client ID is optional.
 # ---------------------------------------------------------------------------
 set -e
 
@@ -42,31 +42,18 @@ if [ ! -f .env ]; then
   say "Created .env from .env.example"
 fi
 
-# --- 3. make sure the Client ID is filled in -------------------------------
+# --- 3. the Client ID is optional ------------------------------------------
 CLIENT_ID=$(grep -E '^NEXT_PUBLIC_GITHUB_CLIENT_ID=' .env | head -n 1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r')
 
 if [ -z "$CLIENT_ID" ]; then
   say ""
-  say "A GitHub OAuth App Client ID is needed (one-time setup):"
+  say "No GitHub Client ID in .env - the project's shared GitHub app will be used."
+  say "Nothing else to do. If you would rather use your own OAuth App later:"
   say "  1. open https://github.com/settings/developers"
   say "  2. New OAuth App -> any name, homepage http://localhost:3000"
   say "  3. after creating it, tick 'Enable Device Flow' and save"
-  say "  4. copy the Client ID and paste it below"
-  say ""
-  printf 'Client ID: '
-  read -r CLIENT_ID
-  CLIENT_ID=$(printf '%s' "$CLIENT_ID" | tr -d '[:space:]')
-
-  if [ -z "$CLIENT_ID" ]; then
-    say "No Client ID entered. Put it into .env manually and run this script again."
-    exit 1
-  fi
-
-  # Rewrite the line in .env without touching the rest of the file.
-  tmp=$(mktemp)
-  sed "s|^NEXT_PUBLIC_GITHUB_CLIENT_ID=.*|NEXT_PUBLIC_GITHUB_CLIENT_ID=$CLIENT_ID|" .env > "$tmp"
-  mv "$tmp" .env
-  say "Saved to .env"
+  say "  4. put the Client ID into NEXT_PUBLIC_GITHUB_CLIENT_ID in .env"
+  say "  5. run this script again"
 fi
 
 # --- 4. build and run -------------------------------------------------------

@@ -209,6 +209,12 @@ export const locale = {
   "auth.permissions": "You will grant repo, workflow, and read:user permissions so the browser can start interacting with GitHub.",
   "auth.start": "Start GitHub connection",
   "auth.restart": "Restart authorization",
+  "auth.sharedAppTitle": "This build uses the project's shared GitHub app",
+  "auth.sharedAppOwner": "Authorization goes through the GitHub OAuth App of this project, so GitHub's authorization screen will show the project owner's name instead of an app of your own.",
+  "auth.sharedAppRateLimit": "GitHub limits verification-code submissions to 50 per hour across all users of one app, so when many people sign in at once the sign-in can fail temporarily. The fix is to retry later or to use your own app.",
+  "auth.sharedAppOwnApp": "To use your own app instead: create an OAuth App at https://github.com/settings/developers, tick “Enable Device Flow”, put its client ID into NEXT_PUBLIC_GITHUB_CLIENT_ID in .env, then restart with docker compose up --build -d. The rebuild is required because Next.js compiles the value into the browser bundle.",
+  "auth.sharedAppToken": "Either way, the app still never sees or stores your GitHub token — it lives in this browser tab only.",
+  "auth.sharedAppContinue": "Continue anyway",
 
   "validation.clientIdRequired": "Client identifier is required",
   "validation.authSecretRequired": "Provider API secret is required",

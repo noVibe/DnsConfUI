@@ -50,15 +50,6 @@ in profile order; disabled profiles use `-` to preserve positional mapping.
 
 ## Quick start
 
-### One-time setup
-
-1. Create a GitHub OAuth App at https://github.com/settings/developers
-2. Enable **Device Flow** for the app
-3. Copy its **Client ID** — you will paste it in below
-
-The Client ID is not a secret (it is visible in the browser by design), and this
-app never uses a client secret.
-
 ### Run with Docker — recommended
 
 Only Docker is needed, no Node.js and no npm.
@@ -67,14 +58,12 @@ Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then:
 - **Windows:** double-click `docker-start.cmd`
 - **macOS / Linux:** run `./docker-start.sh`
 
-The script creates `.env`, asks for your Client ID, builds the image and starts
-the app at http://localhost:3000.
+The script creates `.env`, builds the image and starts the app at
+http://localhost:3000. There is nothing to fill in.
 
 Prefer doing it by hand?
 
 ```bash
-cp .env.example .env     # on Windows: copy .env.example .env
-# Set NEXT_PUBLIC_GITHUB_CLIENT_ID in .env
 docker compose up --build
 ```
 
@@ -84,6 +73,28 @@ Then open http://localhost:3000.
 docker compose logs -f   # logs
 docker compose down      # stop
 ```
+
+### Optional — use your own GitHub OAuth App
+
+Out of the box the app signs you in through the project's own OAuth App, so no
+GitHub setup is needed. The trade-off is that GitHub's authorization screen shows
+the project owner's name, and GitHub's limit of 50 verification-code submissions
+per hour is shared by everyone using that app.
+
+To use an app of your own instead:
+
+1. Create a GitHub OAuth App at https://github.com/settings/developers
+2. Enable **Device Flow** for the app
+3. Copy its **Client ID** into `.env`:
+
+```bash
+cp .env.example .env     # on Windows: copy .env.example .env
+# Set NEXT_PUBLIC_GITHUB_CLIENT_ID in .env
+docker compose up --build -d
+```
+
+The Client ID is not a secret (it is visible in the browser by design), and this
+app never uses a client secret.
 
 After editing `.env`, restart with `docker compose up --build -d` — Next.js
 compiles the Client ID into the browser bundle, so a rebuild is what picks it up.
@@ -97,10 +108,11 @@ Requires Node.js 22 or newer.
 
 ```bash
 npm install
-cp .env.example .env.local
-# Set NEXT_PUBLIC_GITHUB_CLIENT_ID in .env.local
 npm run dev
 ```
+
+To authorize through your own OAuth App, copy `.env.example` to `.env.local`
+and set `NEXT_PUBLIC_GITHUB_CLIENT_ID` there.
 
 ## Tests
 

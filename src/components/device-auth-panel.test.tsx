@@ -14,7 +14,29 @@ vi.mock("@/lib/github/device-flow", () => ({
   pollGitHubDeviceToken: deviceFlowMocks.pollToken,
 }));
 
+// `null` keeps the real, env-driven behaviour; a string forces that client ID,
+// which is the only way to reach the "nothing configured at all" state now
+// that a built-in client ID ships with the app.
+const clientIdOverride = vi.hoisted(() => ({ value: null as string | null }));
+
+vi.mock("@/domain/github-app", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/domain/github-app")>();
+
+  return {
+    ...actual,
+    getGitHubClientId: () =>
+      clientIdOverride.value === null ? actual.getGitHubClientId() : clientIdOverride.value,
+    isUsingBuiltInGitHubClientId: () =>
+      clientIdOverride.value === null
+        ? actual.isUsingBuiltInGitHubClientId()
+        : clientIdOverride.value === actual.BUILT_IN_GITHUB_CLIENT_ID,
+  };
+});
+
 const originalClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+const sharedAppTitle = "Эта сборка использует общее GitHub-приложение проекта";
+const continueAnyway = "Всё равно продолжить";
+const startAuthorization = "Начать подключение к GitHub";
 
 function TokenProbe() {
   const { token } = useAuth();
@@ -36,6 +58,7 @@ describe("DeviceAuthPanel", () => {
   beforeEach(() => {
     deviceFlowMocks.requestCode.mockReset();
     deviceFlowMocks.pollToken.mockReset();
+    clientIdOverride.value = null;
     process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = "client-id";
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -44,17 +67,64 @@ describe("DeviceAuthPanel", () => {
   });
 
   afterEach(() => {
+    clientIdOverride.value = null;
     if (originalClientId === undefined) delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     else process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = originalClientId;
   });
 
-  it("shows local developer setup when the client ID is missing", () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  it("shows local developer setup when no client ID is configured at all", () => {
+    clientIdOverride.value = "";
 
     renderPanel();
 
     expect(screen.getByText("Требуется настройка разработчика")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Начать подключение к GitHub" })).not.toBeInTheDocument();
+    expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: startAuthorization })).not.toBeInTheDocument();
+  });
+
+  it("warns about the shared GitHub app and blocks authorization until it is acknowledged", () => {
+    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+
+    renderPanel();
+
+    expect(screen.getByText(sharedAppTitle)).toBeInTheDocument();
+    expect(screen.getByText(/имя владельца проекта/)).toBeInTheDocument();
+    expect(screen.getByText(/50 в час/)).toBeInTheDocument();
+    expect(screen.getByText(/NEXT_PUBLIC_GITHUB_CLIENT_ID/)).toBeInTheDocument();
+    expect(screen.getByText(/не сохраняет ваш GitHub-токен/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: startAuthorization })).not.toBeInTheDocument();
+    expect(deviceFlowMocks.requestCode).not.toHaveBeenCalled();
+  });
+
+  it("starts authorization with the shared app only after the warning is acknowledged", async () => {
+    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+    deviceFlowMocks.requestCode.mockResolvedValue({
+      device_code: "device-code",
+      user_code: "ABCD-1234",
+      verification_uri: "https://github.com/login/device",
+      expires_in: 900,
+      interval: 60,
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: continueAnyway }));
+
+    expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
+    expect(deviceFlowMocks.requestCode).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: startAuthorization }));
+
+    expect(await screen.findByText("ABCD-1234")).toBeInTheDocument();
+  });
+
+  it("does not warn when an own client ID is configured", () => {
+    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = "Ov23liOwnAppClientId";
+
+    renderPanel();
+
+    expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: continueAnyway })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: startAuthorization })).toBeInTheDocument();
   });
 
   it("starts device authorization and copies the user code", async () => {
