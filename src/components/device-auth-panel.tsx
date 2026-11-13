@@ -1,28 +1,70 @@
 "use client";
 
-import { Check, Copy, GitBranch, Info, KeyRound, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { getGitHubClientId, isUsingBuiltInGitHubClientId } from "@/domain/github-app";
+import { Check, ChevronDown, Copy, GitBranch, KeyRound, Loader2 } from "lucide-react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { getGitHubClientId, isPlausibleGitHubClientId, isUsingBuiltInGitHubClientId } from "@/domain/github-app";
+import { readGitHubClientIdOverride, writeGitHubClientIdOverride } from "@/lib/github/client-id";
 import { requestGitHubDeviceCode, pollGitHubDeviceToken, type DeviceCodeResponse } from "@/lib/github/device-flow";
 import { useAuth } from "./auth-provider";
 import { useLocale } from "@/lib/i18n/context";
-import { Button, SecondaryButton } from "./ui";
+import { Button, SecondaryButton, cn, inputClass } from "./ui";
 
 type AuthState = "idle" | "starting" | "waiting" | "done" | "error";
+
+/**
+ * A section that stays folded until it is asked for.
+ *
+ * A native `<details>`, like the other collapsibles in the app: nothing to keep in state, keyboard and
+ * screen-reader navigable on its own, and it survives a re-render. The chevron is turned by a selector that looks
+ * only at the `<details>` directly above it, because these sections nest: the usual `group-open:` class matches any
+ * open ancestor, so an inner chevron would point down the moment an outer section was opened.
+ */
+function Collapsible({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <details className={className}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-left text-sm font-semibold text-ink/60">
+        <ChevronDown
+          className="size-3.5 shrink-0 text-moss transition [details[open]>summary>&]:rotate-180"
+          aria-hidden="true"
+        />
+        {title}
+      </summary>
+      {children}
+    </details>
+  );
+}
 
 export function DeviceAuthPanel() {
   const { setToken } = useAuth();
   const { t } = useLocale();
+  const fieldId = useId();
+  const fieldErrorId = useId();
+  const fieldHintId = useId();
   const [device, setDevice] = useState<DeviceCodeResponse | null>(null);
   const [state, setState] = useState<AuthState>("idle");
   const [message, setMessage] = useState<string>("");
+  const [copied, setCopied] = useState(false);
   const pollingRef = useRef<number | null>(null);
-  const gitHubClientId = getGitHubClientId();
-  const usesSharedGitHubApp = isUsingBuiltInGitHubClientId();
-  // The shared-app warning has to be acknowledged before the device flow can
-  // be started, so authorization cannot begin by accident.
-  const [sharedAppAccepted, setSharedAppAccepted] = useState(false);
-  const sharedAppWarningPending = usesSharedGitHubApp && !sharedAppAccepted;
+
+  /**
+   * The client ID typed into this panel, which wins over the one the build was given.
+   *
+   * This is how someone running the app locally authorizes through an OAuth App of their own: a client ID is public
+   * by design and the device flow uses no client secret, so there is nothing here to protect and nothing to
+   * rebuild - the value only travels to GitHub as `client_id`.
+   */
+  const [ownClientId, setOwnClientId] = useState("");
+  const [draft, setDraft] = useState("");
+  const [draftInvalid, setDraftInvalid] = useState(false);
+
+  // Read after mount rather than during render: localStorage does not exist while the page is rendered on the
+  // server, so a value read in the render body would make the first client render disagree with its own HTML.
+  useEffect(() => {
+    const stored = readGitHubClientIdOverride();
+    if (stored === "") return;
+    setOwnClientId(stored);
+    setDraft(stored);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -32,14 +74,40 @@ export function DeviceAuthPanel() {
     };
   }, []);
 
-  const [copied, setCopied] = useState(false);
+  const clientId = ownClientId || getGitHubClientId();
+  const usesSharedApp = isUsingBuiltInGitHubClientId(clientId);
+  // Only reachable in a build whose client ID was deliberately emptied; the field below is the way out of it.
+  const noClientId = clientId === "";
 
-  async function start() {
-    if (sharedAppWarningPending) {
+  /**
+   * Takes a client ID into use, or forgets it when given an empty string.
+   *
+   * A device code can only be redeemed by the app it was issued to, so changing the app throws away the code in
+   * hand and stops it being polled instead of letting the flow fail later with a puzzling answer from GitHub.
+   */
+  function adoptClientId(value: string) {
+    if (pollingRef.current) window.clearTimeout(pollingRef.current);
+    setOwnClientId(value);
+    writeGitHubClientIdOverride(value);
+    setDraft(value);
+    setDraftInvalid(false);
+    setDevice(null);
+    setState("idle");
+    setMessage("");
+  }
+
+  function applyClientId(event: FormEvent) {
+    event.preventDefault();
+    const typed = draft.trim();
+    if (typed !== "" && !isPlausibleGitHubClientId(typed)) {
+      setDraftInvalid(true);
       return;
     }
+    adoptClientId(typed);
+  }
 
-    if (!gitHubClientId) {
+  async function start() {
+    if (!clientId) {
       setState("error");
       setMessage(t('auth.clientIdRequired'));
       return;
@@ -51,7 +119,7 @@ export function DeviceAuthPanel() {
     setMessage("");
 
     try {
-      const response = await requestGitHubDeviceCode();
+      const response = await requestGitHubDeviceCode(ownClientId);
       setDevice(response);
       setState("waiting");
       copyCode(response);
@@ -70,12 +138,12 @@ export function DeviceAuthPanel() {
 
   function schedulePoll(deviceCode: string, interval: number) {
     pollingRef.current = window.setTimeout(async () => {
-      if (!gitHubClientId) {
+      if (!clientId) {
         return;
       }
 
       try {
-        const result = await pollGitHubDeviceToken(deviceCode);
+        const result = await pollGitHubDeviceToken(deviceCode, ownClientId);
 
         if ("access_token" in result) {
           setToken(result.access_token);
@@ -102,6 +170,69 @@ export function DeviceAuthPanel() {
     }, interval * 1000);
   }
 
+  /** The field that points the app at an OAuth App of the user's own, with the three steps that produce one. */
+  function clientIdForm() {
+    return (
+      <div className="mt-2 space-y-2">
+        <ol className="list-decimal space-y-1 pl-5 text-sm leading-6 text-ink/72">
+          <li>{t('auth.app.step1')}</li>
+          <li>{t('auth.app.step2')}</li>
+          <li>{t('auth.app.step3')}</li>
+        </ol>
+        <a
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:border-steel"
+          href="https://github.com/settings/developers"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <GitBranch className="size-3.5" aria-hidden="true" />
+          {t('auth.openGhDev')}
+        </a>
+        <form onSubmit={applyClientId} className="flex flex-wrap items-end gap-2">
+          <div className="min-w-48 flex-1">
+            <label htmlFor={fieldId} className="text-xs font-medium text-ink/70">
+              {t('auth.app.fieldLabel')}
+            </label>
+            <input
+              id={fieldId}
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setDraftInvalid(false);
+              }}
+              placeholder="Ov23li…"
+              autoComplete="off"
+              spellCheck={false}
+              aria-invalid={draftInvalid}
+              aria-describedby={draftInvalid ? fieldErrorId : fieldHintId}
+              className={cn(inputClass, "mt-1 h-9 min-h-0 py-0 text-sm", draftInvalid && "border-coral")}
+            />
+          </div>
+          <SecondaryButton type="submit" className="min-h-9 px-3 py-1.5 text-xs">
+            {t('auth.app.apply')}
+          </SecondaryButton>
+        </form>
+        {draftInvalid ? (
+          <p id={fieldErrorId} className="text-xs text-coral">
+            {t('auth.app.fieldInvalid')}
+          </p>
+        ) : null}
+        <p id={fieldHintId} className="text-xs leading-5 text-ink/50">
+          {t('auth.app.fieldHint')}
+        </p>
+        {ownClientId ? (
+          <p className="text-xs leading-5 text-ink/60">
+            {t('auth.app.inUse', { clientId: ownClientId })}{" "}
+            <button type="button" onClick={() => adoptClientId("")} className="underline hover:text-ink">
+              {t('auth.app.forget')}
+            </button>
+          </p>
+        ) : null}
+        <p className="text-xs leading-5 text-ink/50">{t('auth.app.envAlternative')}</p>
+      </div>
+    );
+  }
+
   return (
     <section aria-labelledby="connect-title">
       <div className="flex items-start gap-3">
@@ -119,46 +250,19 @@ export function DeviceAuthPanel() {
       </div>
 
       <div className="mt-6 rounded-lg border border-line bg-paper p-4">
-        {!gitHubClientId ? (
+        {noClientId ? (
           <div className="space-y-3">
-            <div className="text-base font-semibold text-ink">{t('auth.devSetup')}</div>
-            <p className="text-sm leading-6 text-ink/70">
-              {t('auth.devSetupDesc')}
-            </p>
-            <div className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink/72">
-              {t('auth.envVar')}
-            </div>
-            <p className="text-sm leading-6 text-ink/70">
-              {t('auth.localDevDesc')}
-            </p>
-            <a
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-steel"
-              href="https://github.com/settings/developers"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <GitBranch className="size-4" aria-hidden="true" />
-              {t('auth.openGhDev')}
-            </a>
+            <div className="text-base font-semibold text-ink">{t('auth.app.missingTitle')}</div>
+            <p className="text-sm leading-6 text-ink/70">{t('auth.app.missing')}</p>
+            {clientIdForm()}
           </div>
-        ) : sharedAppWarningPending ? (
-          <div className="space-y-3">
-            <div className="flex items-start gap-2">
-              <Info className="mt-0.5 size-5 shrink-0 text-coral" aria-hidden="true" />
-              <div className="text-base font-semibold text-ink">{t('auth.sharedAppTitle')}</div>
-            </div>
-            <div className="space-y-3 rounded-md border border-coral/30 bg-coral/10 p-3">
-              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppOwner')}</p>
-              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppRateLimit')}</p>
-              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppOwnApp')}</p>
-              <p className="text-sm leading-6 text-ink/80">{t('auth.sharedAppToken')}</p>
-            </div>
-            <Button className="w-full" onClick={() => setSharedAppAccepted(true)}>
-              <GitBranch className="size-4" aria-hidden="true" />
-              {t('auth.sharedAppContinue')}
-            </Button>
-          </div>
-        ) : device ? (
+        ) : device && state !== "error" ? (
+          /*
+            A failed authorization goes back to this panel's first screen rather than leaving the dead code on
+            display. Every error that gets here is terminal - the code was denied, expired, or the app ran into
+            GitHub's hourly limit - so the code in hand is worthless, and the one thing that would help, a client
+            ID of the user's own, is on that screen. The error itself and the restart button are below, unchanged.
+          */
           <div className="space-y-4">
             <div>
               <div className="text-sm font-medium text-ink/70">{t('auth.enterCode')}</div>
@@ -198,6 +302,34 @@ export function DeviceAuthPanel() {
           </div>
         ) : (
           <div className="space-y-4">
+            {/*
+              Folded by default: which OAuth App signs you in matters, but it is not what the page is for, and
+              four paragraphs of it standing between the user and the one button they came to press was the
+              whole problem. The sections inside open one at a time, so only the answer being looked for is read.
+            */}
+            <Collapsible
+              title={usesSharedApp ? t('auth.app.sharedTitle') : t('auth.app.ownTitle')}
+              className="rounded-md border border-line bg-white p-3"
+            >
+              <div className="mt-2 divide-y divide-line">
+                {usesSharedApp ? (
+                  <>
+                    <Collapsible title={t('auth.app.ownerTitle')} className="py-2">
+                      <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.owner')}</p>
+                    </Collapsible>
+                    <Collapsible title={t('auth.app.rateLimitTitle')} className="py-2">
+                      <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.rateLimit')}</p>
+                    </Collapsible>
+                  </>
+                ) : null}
+                <Collapsible title={t('auth.app.tokenTitle')} className="py-2">
+                  <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.token')}</p>
+                </Collapsible>
+                <Collapsible title={t('auth.app.ownAppTitle')} className="py-2">
+                  {clientIdForm()}
+                </Collapsible>
+              </div>
+            </Collapsible>
             <p className="text-sm leading-6 text-ink/70">
               {t('auth.permissions')}
             </p>

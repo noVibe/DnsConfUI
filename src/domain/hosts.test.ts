@@ -310,6 +310,49 @@ describe("applyOverrides", () => {
     );
   });
 
+  it("leaves the blocking entries out of the result when their class is omitted", () => {
+    const text = crlf("# head", "0.0.0.0 ads.example", "127.0.0.1 localhost", "", "1.2.3.4 a.example", "");
+
+    const result = applyOverrides(parseHosts(text), { "a.example": "9.9.9.9" }, { omit: ["blocking"] });
+
+    // The comment and the blank line say what the file is, so they stay whatever is left out of it.
+    expect(result).toBe(`${crlf("# head", "", "9.9.9.9 a.example")}\r\n`);
+  });
+
+  it("leaves the entries nothing can refresh out of the result when their classes are omitted", () => {
+    const text = crlf(
+      "# head",
+      "2a02:e00:ffec:4b8::1 ntc.party",
+      "5.5.5.5 not a_hostname!",
+      "0.0.0.0 ads.example",
+      "1.2.3.4 a.example",
+      ""
+    );
+
+    const result = applyOverrides(parseHosts(text), { "a.example": "9.9.9.9" }, { omit: ["ipv6", "invalid"] });
+
+    expect(result).toBe(`${crlf("# head", "0.0.0.0 ads.example", "9.9.9.9 a.example")}\r\n`);
+  });
+
+  it("carries every class when nothing is omitted", () => {
+    const parsed = parseHosts(crlf("0.0.0.0 ads.example", "2a02:e00:ffec:4b8::1 ntc.party", "1.2.3.4 a.example", ""));
+    const overrides = { "a.example": "9.9.9.9" };
+
+    expect(applyOverrides(parsed, overrides, { omit: [] })).toBe(applyOverrides(parsed, overrides));
+    expect(applyOverrides(parsed, overrides)).toContain("0.0.0.0 ads.example");
+  });
+
+  it("keeps the file's own ending when the omitted class held the last line", () => {
+    const result = applyOverrides(
+      parseHosts(`${lf("1.2.3.4 a.example", "0.0.0.0 ads.example")}\n`),
+      { "a.example": "9.9.9.9" },
+      { omit: ["blocking"] }
+    );
+
+    expect(result).toBe("9.9.9.9 a.example\n");
+    expect(result).not.toContain("\r");
+  });
+
   it("keeps comments, section headers and blank lines in place", () => {
     const text = crlf(
       "### example: hosts file",

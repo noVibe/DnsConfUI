@@ -29,6 +29,15 @@ function tokenRequest(body: unknown) {
   });
 }
 
+/** The browser names the app to authorize with, or sends an empty string for "the one this build has". */
+function codeRequest(body: unknown = { client_id: "" }) {
+  return new Request("http://localhost/api/github/device/code", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("GitHub device flow routes", () => {
   beforeEach(() => {
     fetchMock.mockReset();
@@ -47,7 +56,7 @@ describe("GitHub device flow routes", () => {
   it("reports a missing GitHub client ID", async () => {
     clientIdOverride.value = "";
 
-    const response = await requestCode();
+    const response = await requestCode(codeRequest());
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ message: "GitHub client ID is not configured." });
@@ -58,7 +67,7 @@ describe("GitHub device flow routes", () => {
     delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
 
-    const response = await requestCode();
+    const response = await requestCode(codeRequest());
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
@@ -85,7 +94,7 @@ describe("GitHub device flow routes", () => {
   it("requests a device code with the required scopes", async () => {
     fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
 
-    const response = await requestCode();
+    const response = await requestCode(codeRequest());
 
     await expect(response.json()).resolves.toEqual({ device_code: "dc" });
     expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
@@ -121,6 +130,54 @@ describe("GitHub device flow routes", () => {
         device_code: "dc",
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
+    }));
+  });
+
+  it("authorizes with the client ID the browser supplied instead of the build's", async () => {
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
+
+    const response = await requestCode(codeRequest({ client_id: "Ov23liOwnAppClientId" }));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
+      body: JSON.stringify({ client_id: "Ov23liOwnAppClientId", scope: "repo workflow read:user" }),
+    }));
+  });
+
+  it("redeems the device code with the client ID it was issued to", async () => {
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ access_token: "token" }) });
+
+    const response = await requestToken(tokenRequest({ device_code: "dc", client_id: "Ov23liOwnAppClientId" }));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/oauth/access_token", expect.objectContaining({
+      body: JSON.stringify({
+        client_id: "Ov23liOwnAppClientId",
+        device_code: "dc",
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+      }),
+    }));
+  });
+
+  // Quietly falling back to the shared app would authorize against an app the user did not ask for, and the
+  // mistake would surface later as a puzzling answer from GitHub rather than at the field they typed it into.
+  it("refuses a supplied client ID that cannot be one, on both routes", async () => {
+    const code = await requestCode(codeRequest({ client_id: "not a client id" }));
+    const token = await requestToken(tokenRequest({ device_code: "dc", client_id: "not a client id" }));
+
+    expect(code.status).toBe(400);
+    expect(token.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("takes a request with no client ID in it as the build's own", async () => {
+    fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
+
+    const response = await requestCode(codeRequest({}));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
+      body: JSON.stringify({ client_id: "client-id", scope: "repo workflow read:user" }),
     }));
   });
 });

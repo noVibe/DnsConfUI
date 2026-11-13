@@ -22,10 +22,16 @@ const githubHeaders = {
   "Content-Type": "application/json"
 };
 
-export async function requestGitHubDeviceCode(): Promise<DeviceCodeResponse> {
+/**
+ * `clientId` is the OAuth App to authorize with when the user named one of
+ * their own in the UI. An empty string means the one this build was given, so
+ * the routes stay the only place that knows what that is.
+ */
+export async function requestGitHubDeviceCode(clientId = ""): Promise<DeviceCodeResponse> {
   const response = await fetch("/api/github/device/code", {
     method: "POST",
-    headers: githubHeaders
+    headers: githubHeaders,
+    body: JSON.stringify({ client_id: clientId })
   });
 
   if (!response.ok) {
@@ -35,14 +41,17 @@ export async function requestGitHubDeviceCode(): Promise<DeviceCodeResponse> {
   return response.json();
 }
 
+/** The device code has to be redeemed with the same app that issued it, hence the same `clientId`. */
 export async function pollGitHubDeviceToken(
-  deviceCode: string
+  deviceCode: string,
+  clientId = ""
 ): Promise<DeviceTokenResponse | DeviceFlowError> {
   const response = await fetch("/api/github/device/token", {
     method: "POST",
     headers: githubHeaders,
     body: JSON.stringify({
-      device_code: deviceCode
+      device_code: deviceCode,
+      client_id: clientId
     })
   });
 

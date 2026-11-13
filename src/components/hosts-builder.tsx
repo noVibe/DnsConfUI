@@ -1,13 +1,14 @@
 "use client";
 
 import { Download, Loader2 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { DEFAULT_DNS_DONOR, getDnsDonorLabel } from "@/domain/dns-donors";
 import {
   applyOverrides,
   overridableHostnames,
   parseHosts,
   summarizeHosts,
+  type HostsEntryClass,
   type HostsSummary,
   type ParsedHostsFile
 } from "@/domain/hosts";
@@ -174,6 +175,37 @@ function Radio({
   );
 }
 
+/**
+ * Whether a group of entries the run only copies through is carried into the result at all.
+ *
+ * The visible wording is the same on every group, so each checkbox is given its own accessible name: a screen
+ * reader moving between the form controls would otherwise meet two boxes both called "include in the file".
+ */
+function Include({
+  label,
+  text,
+  checked,
+  onChange
+}: {
+  label: string;
+  text: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-1.5 text-xs text-ink/50">
+      <input
+        type="checkbox"
+        aria-label={label}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-3.5 accent-moss"
+      />
+      {text}
+    </label>
+  );
+}
+
 export function HostsBuilder() {
   const { t } = useLocale();
   const headingId = useId();
@@ -200,16 +232,20 @@ export function HostsBuilder() {
   const [noDonors, setNoDonors] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  /** The run's own answers, kept so a change to what the file should carry can rebuild it without resolving again. */
+  const [resolvedIps, setResolvedIps] = useState<ReadonlyMap<string, string> | null>(null);
+  const [includeBlocking, setIncludeBlocking] = useState(true);
+  const [includeOther, setIncludeOther] = useState(true);
 
   const runRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
   /** Only one offered file at a time: the previous object URL is released as soon as it is replaced. */
-  function offer(text: string | null) {
+  const offer = useCallback((text: string | null) => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = text === null ? null : URL.createObjectURL(new Blob([text], { type: "text/plain" }));
     setDownloadUrl(objectUrlRef.current);
-  }
+  }, []);
 
   useEffect(
     () => () => {
@@ -219,12 +255,30 @@ export function HostsBuilder() {
     []
   );
 
+  /**
+   * Writes the file on offer out of the run's answers and the two inclusion choices.
+   *
+   * Which entries the result carries is a different question from which addresses are current, so it is answered
+   * here instead of at the end of the run: unticking a group afterwards rebuilds the file from the answers already
+   * in hand, with nothing asked of DNS again. Doing it in an effect rather than in the checkbox's own handler is
+   * what keeps a tick during a run honest, because the run would otherwise write the file with the flags it closed
+   * over when it started.
+   */
+  useEffect(() => {
+    if (!base || !resolvedIps) return;
+    const omit: HostsEntryClass[] = [];
+    if (!includeBlocking) omit.push("blocking");
+    if (!includeOther) omit.push("ipv6", "invalid");
+    offer(applyOverrides(base.parsed, resolvedIps, { omit }));
+  }, [base, resolvedIps, includeBlocking, includeOther, offer]);
+
   function resetRun() {
     setProgress(NO_PROGRESS);
     setDonorCounts([]);
     setRetried(false);
     setNoDonors(false);
     setCancelled(false);
+    setResolvedIps(null);
     offer(null);
   }
 
@@ -462,13 +516,22 @@ export function HostsBuilder() {
       return;
     }
 
-    offer(applyOverrides(base.parsed, overrides));
+    setResolvedIps(overrides);
     setPhase("done");
   }
 
   function cancel() {
     runRef.current?.abort();
   }
+
+  /**
+   * The three groups the summary shows account for every entry in the file: the redirects a run refreshes, the
+   * blocking pins, and what nothing here can refresh. `otherEntries` is the third of them, which is two entry
+   * classes rather than one, because the reason they are only copied through is the same from where the user sits.
+   */
+  const otherEntries = base === null ? 0 : base.summary.ipv6Entries + base.summary.invalidEntries;
+  /** A published list or an address of the user's own is a link; a file from their computer is only a name. */
+  const sourceHref = base !== null && /^https?:\/\//i.test(base.origin) ? base.origin : null;
 
   const resolving = phase === "resolving" || phase === "sweeping";
   const running = phase === "loading" || phase === "ranking" || resolving;
@@ -601,14 +664,62 @@ export function HostsBuilder() {
 
       {base ? (
         <div className="mt-4 border-t border-line pt-3">
-          <h3 className="text-xs font-medium text-ink/70">{t("hosts.summary.title", { origin: base.origin })}</h3>
-          <ul className="mt-1.5 grid gap-0.5 text-xs text-ink/60">
+          <h3 className="text-xs font-medium text-ink/70">
+            {t("hosts.summary.title")}
+            {" ("}
+            {sourceHref ? (
+              <a
+                href={sourceHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                {t("hosts.summary.source")}
+              </a>
+            ) : (
+              base.origin
+            )}
+            {")"}
+          </h3>
+          <ul className="mt-1.5 grid gap-1 text-xs text-ink/60">
             <li>{t("hosts.summary.entries", { entries: base.summary.entries, lines: base.summary.lines })}</li>
-            <li>{t("hosts.summary.toResolve", { count: base.summary.overridableHostnames })}</li>
-            <li>{t("hosts.summary.blocking", { count: base.summary.blockingEntries })}</li>
-            {base.summary.ipv6Entries + base.summary.invalidEntries > 0 ? (
-              <li>{t("hosts.summary.skipped", { count: base.summary.ipv6Entries + base.summary.invalidEntries })}</li>
-            ) : null}
+            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                {t("hosts.group.redirect", { count: base.summary.overridableEntries })}
+                <Tooltip
+                  text={t("hosts.group.redirectHint", { domains: base.summary.overridableHostnames })}
+                  className="size-3"
+                />
+              </span>
+            </li>
+            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                {t("hosts.group.blocking", { count: base.summary.blockingEntries })}
+                <Tooltip text={t("hosts.group.blockingHint")} className="size-3" />
+              </span>
+              {base.summary.blockingEntries > 0 ? (
+                <Include
+                  label={t("hosts.group.includeBlocking")}
+                  text={t("hosts.group.include")}
+                  checked={includeBlocking}
+                  onChange={setIncludeBlocking}
+                />
+              ) : null}
+            </li>
+            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-1">
+                {t("hosts.group.other", { count: otherEntries })}
+                <Tooltip text={t("hosts.group.otherHint")} className="size-3" />
+              </span>
+              {otherEntries > 0 ? (
+                <Include
+                  label={t("hosts.group.includeOther")}
+                  text={t("hosts.group.include")}
+                  checked={includeOther}
+                  onChange={setIncludeOther}
+                />
+              ) : null}
+            </li>
           </ul>
         </div>
       ) : null}

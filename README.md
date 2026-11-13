@@ -85,7 +85,17 @@ To use an app of your own instead:
 
 1. Create a GitHub OAuth App at https://github.com/settings/developers
 2. Enable **Device Flow** for the app
-3. Copy its **Client ID** into `.env`:
+3. Paste its **Client ID** into the field on the app's own start screen, under
+   *"You are signing in through the project's shared GitHub app" → "Use an app
+   of your own"*
+
+That takes effect immediately and is remembered in your browser: no rebuild, no
+restart, no environment variable. The Client ID is not a secret — it is part of
+every authorization request and is visible in the browser by design — and this
+app never uses a client secret.
+
+The same ID can be compiled into the image instead, for a deployment that should
+come up already configured:
 
 ```bash
 cp .env.example .env     # on Windows: copy .env.example .env
@@ -93,11 +103,8 @@ cp .env.example .env     # on Windows: copy .env.example .env
 docker compose up --build -d
 ```
 
-The Client ID is not a secret (it is visible in the browser by design), and this
-app never uses a client secret.
-
-After editing `.env`, restart with `docker compose up --build -d` — Next.js
-compiles the Client ID into the browser bundle, so a rebuild is what picks it up.
+That way needs the rebuild: Next.js compiles the value into the browser bundle,
+so `--build` is what picks up a change.
 
 **[DOCKER.md](DOCKER.md) has the full step-by-step guide and troubleshooting
 (also in Russian / на русском).**

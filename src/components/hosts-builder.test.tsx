@@ -26,6 +26,19 @@ const BASE =
     "4.4.4.4 single"
   ].join(CRLF) + CRLF;
 
+/**
+ * One of each kind of entry, so the three groups in the summary are all non-empty: a domain to refresh, a blocking
+ * pin, and the two a run can only copy through - an IPv6 address and a line whose name is not a name.
+ */
+const BASE_WITH_OTHER =
+  [
+    "# base list",
+    "1.1.1.1 a.example",
+    "0.0.0.0 ads.example",
+    "2a00::1 c.example",
+    "5.5.5.5 not a_hostname!"
+  ].join(CRLF) + CRLF;
+
 function manyHosts(count: number): string {
   return Array.from({ length: count }, (_, index) => `9.9.9.9 h${index}.example`).join(CRLF) + CRLF;
 }
@@ -134,7 +147,7 @@ async function uploadBase(text = BASE, name = "hosts") {
   fireEvent.change(screen.getByLabelText("Выберите файл hosts"), {
     target: { files: [new File([text], name, { type: "text/plain" })] }
   });
-  await screen.findByText(`В файле ${name}`);
+  await screen.findByText(`В файле (${name})`);
 }
 
 function start() {
@@ -178,11 +191,23 @@ describe("HostsBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Загрузить" }));
 
     expect(callsTo("/api/hosts/source")).toEqual([{ source: "geohide" }]);
-    expect(await screen.findByText("В файле https://geohide.ru/hosts")).toBeInTheDocument();
+    // The address is behind the word rather than printed into the summary.
+    expect(await screen.findByRole("link", { name: "источник" })).toHaveAttribute(
+      "href",
+      "https://geohide.ru/hosts"
+    );
     expect(screen.getByText("Записей: 5 в 6 строках")).toBeInTheDocument();
-    // Two, not three: the single-label entry is legal and is kept, but no public resolver can be asked about it.
-    expect(screen.getByText("Доменов для перепроверки: 2")).toBeInTheDocument();
-    expect(screen.getByText("Блокирующих записей без изменений: 1")).toBeInTheDocument();
+    // The three groups account for all five entries: four to refresh, one blocking pin, nothing else.
+    expect(screen.getByText("Перенаправление: 4")).toBeInTheDocument();
+    expect(screen.getByText("Блокировка: 1")).toBeInTheDocument();
+    expect(screen.getByText("Прочее: 0")).toBeInTheDocument();
+    // Two domains, not three: the single-label entry is legal and is kept, but no resolver can be asked about it.
+    expect(screen.getByRole("note", { name: /Каждый из 2 доменов/ })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Включать записи блокировки в итоговый файл" })).toBeChecked();
+    // Nothing to include or leave out of an empty group, so it is offered no choice.
+    expect(
+      screen.queryByRole("checkbox", { name: "Включать прочие записи в итоговый файл" })
+    ).not.toBeInTheDocument();
   });
 
   it("asks the server for the published list the user picked", async () => {
@@ -192,7 +217,7 @@ describe("HostsBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Загрузить" }));
 
     expect(callsTo("/api/hosts/source")).toEqual([{ source: "malw" }]);
-    await screen.findByText("В файле https://geohide.ru/hosts");
+    await screen.findByRole("link", { name: "источник" });
   });
 
   it("passes an address of the user's own to the server untouched", async () => {
@@ -205,7 +230,7 @@ describe("HostsBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Загрузить" }));
 
     expect(callsTo("/api/hosts/source")).toEqual([{ url: "https://lists.example/hosts" }]);
-    await screen.findByText("В файле https://geohide.ru/hosts");
+    await screen.findByRole("link", { name: "источник" });
   });
 
   it("refuses an address that is not HTTPS without calling the server", async () => {
@@ -228,7 +253,9 @@ describe("HostsBuilder", () => {
     await uploadBase();
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText("Доменов для перепроверки: 2")).toBeInTheDocument();
+    expect(screen.getByText("Перенаправление: 4")).toBeInTheDocument();
+    // A file of the user's own has no address to link to, so its name stands in the heading instead.
+    expect(screen.queryByRole("link", { name: "источник" })).not.toBeInTheDocument();
   });
 
   it("sends exactly the donor chosen in manual mode", async () => {
@@ -645,5 +672,45 @@ describe("HostsBuilder", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Готово: 2 из 3 доменов получили рабочий адрес, 1 оставили прежний."
     );
+  });
+
+  it("leaves the blocking entries out of the file once the user unticks them", async () => {
+    renderBuilder();
+    await uploadBase(BASE_WITH_OTHER, "mixed");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    expect((await blobs[0].text()).split(CRLF)).toContain("0.0.0.0 ads.example");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Включать записи блокировки в итоговый файл" }));
+
+    await waitFor(() => expect(blobs).toHaveLength(2));
+    const produced = (await blobs[1].text()).split(CRLF);
+    expect(produced).not.toContain("0.0.0.0 ads.example");
+    // Only that group goes: the refreshed entry, the ones it cannot refresh and the comment all stay.
+    expect(produced).toContain(`${ipFor("a.example")} a.example`);
+    expect(produced).toContain("2a00::1 c.example");
+    expect(produced).toContain("# base list");
+    expect(screen.getByRole("link", { name: "Скачать файл hosts" })).toHaveAttribute("href", "blob:hosts-2");
+    // Rebuilt from the answers already in hand, so the choice costs no DNS.
+    expect(callsTo("/api/hosts/resolve")).toHaveLength(1);
+  });
+
+  it("leaves the entries it cannot refresh out of the file once the user unticks them", async () => {
+    renderBuilder();
+    await uploadBase(BASE_WITH_OTHER, "mixed");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    expect(screen.getByText("Прочее: 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Включать прочие записи в итоговый файл" }));
+
+    await waitFor(() => expect(blobs).toHaveLength(2));
+    const produced = (await blobs[1].text()).split(CRLF);
+    expect(produced).not.toContain("2a00::1 c.example");
+    expect(produced).not.toContain("5.5.5.5 not a_hostname!");
+    expect(produced).toContain("0.0.0.0 ads.example");
+    expect(produced).toContain(`${ipFor("a.example")} a.example`);
   });
 });

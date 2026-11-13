@@ -55,6 +55,21 @@ export type ParsedHostsFile = {
 /** hostname -> freshly resolved IPv4 address. Hostname keys are case-insensitive. */
 export type HostsOverrides = ReadonlyMap<string, string> | Readonly<Record<string, string>>;
 
+/** What a rewritten file carries. By default it carries every line the original had. */
+export type HostsOutputOptions = {
+  /**
+   * Entry classes to leave out of the result entirely, with their lines.
+   *
+   * A published list is two things at once: the redirects a run is here to refresh, and entries it can only copy
+   * through - the blocking pins, and the ones nothing here can refresh at all. Someone who wants only the redirects
+   * says so here instead of editing the result by hand afterwards.
+   *
+   * Comments, blank lines and unparsed lines are never dropped, whatever is listed: they say what the file is, and
+   * removing them would be rewriting the file rather than choosing what it carries.
+   */
+  readonly omit?: readonly HostsEntryClass[];
+};
+
 export type HostsSummary = {
   readonly lines: number;
   readonly entries: number;
@@ -297,7 +312,10 @@ function addToGroup(groups: OutputGroup[], ip: string, hostname: string): void {
  * - A hostname with no usable new IP keeps all of its original lines, byte for
  *   byte.
  * - Comments, blank lines, unparsed lines, blocking entries, IPv6 entries and
- *   implausible hostnames pass through untouched and in place.
+ *   implausible hostnames pass through untouched and in place, unless their
+ *   entry class is listed in `options.omit`, which leaves their lines out of the
+ *   result altogether. Comments, blank lines and unparsed lines have no entry
+ *   class and so are always kept.
  * - A line with several hostnames is regrouped rather than duplicated: the
  *   hostnames it still owns are bucketed by their new address, so one line is
  *   emitted per distinct address (plus one carrying any hostname that was not
@@ -309,12 +327,18 @@ function addToGroup(groups: OutputGroup[], ip: string, hostname: string): void {
  *   that are passed through.
  * - The original line ending and trailing-newline state are preserved.
  */
-export function applyOverrides(parsed: ParsedHostsFile, resolved: HostsOverrides): string {
+export function applyOverrides(
+  parsed: ParsedHostsFile,
+  resolved: HostsOverrides,
+  options: HostsOutputOptions = {}
+): string {
   const overrides = toOverrideMap(resolved);
+  const omit = new Set(options.omit ?? []);
   const claimed = new Set<string>();
   const out: string[] = [];
 
   for (const line of parsed.lines) {
+    if (line.kind === "entry" && omit.has(line.entryClass)) continue;
     if (line.kind !== "entry" || line.entryClass !== "overridable") {
       out.push(line.raw);
       continue;

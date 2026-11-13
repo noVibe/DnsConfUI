@@ -45,8 +45,20 @@ describe("requestGitHubDeviceCode", () => {
     expect(result).toEqual(deviceCode);
     expect(mockFetch).toHaveBeenCalledWith("/api/github/device/code", {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" }
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      // An empty client ID leaves the choice of app to the route, which is the one place that knows it.
+      body: JSON.stringify({ client_id: "" })
     });
+  });
+
+  it("names the app to authorize with when the user supplied one", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ device_code: "dc" }) });
+
+    await requestGitHubDeviceCode("Ov23liOwnAppClientId");
+
+    expect(mockFetch).toHaveBeenCalledWith("/api/github/device/code", expect.objectContaining({
+      body: JSON.stringify({ client_id: "Ov23liOwnAppClientId" })
+    }));
   });
 
   it("throws when response is not ok", async () => {
@@ -82,8 +94,18 @@ describe("pollGitHubDeviceToken", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/github/device/token", {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ device_code: "dc123" })
+      body: JSON.stringify({ device_code: "dc123", client_id: "" })
     });
+  });
+
+  it("redeems the code with the same app that issued it", async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ access_token: "abc" }) });
+
+    await pollGitHubDeviceToken("dc123", "Ov23liOwnAppClientId");
+
+    expect(mockFetch).toHaveBeenCalledWith("/api/github/device/token", expect.objectContaining({
+      body: JSON.stringify({ device_code: "dc123", client_id: "Ov23liOwnAppClientId" })
+    }));
   });
 
   it("returns device flow error on non-ok response", async () => {

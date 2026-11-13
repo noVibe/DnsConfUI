@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
-import { getGitHubClientId } from "@/domain/github-app";
+import { getGitHubClientId, resolveGitHubClientId } from "@/domain/github-app";
 
-export async function POST() {
-  const gitHubClientId = getGitHubClientId();
+/**
+ * Starts the device flow.
+ *
+ * The browser may name the OAuth App to authorize with (`client_id`), which is
+ * how someone running this locally uses an app of their own without rebuilding
+ * the image; without it the app authorizes with the client ID of this build.
+ */
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => null)) as { client_id?: unknown } | null;
+  const gitHubClientId = resolveGitHubClientId(body?.client_id, getGitHubClientId());
+
+  if (gitHubClientId === null) {
+    return NextResponse.json({ message: "That is not a GitHub client ID." }, { status: 400 });
+  }
 
   if (!gitHubClientId) {
     return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
