@@ -1,0 +1,39 @@
+# Dependencies and build output are produced inside the image.
+node_modules
+.next
+out
+dist
+coverage
+
+# Local tooling / VCS noise
+.git
+.github
+.gitignore
+.tools
+.claude
+.idea
+.vscode
+AGENTS.md
+CLAUDE.md
+tsconfig.tsbuildinfo
+
+# Never bake local configuration or secrets into the image.
+# The Client ID is passed in as a build argument by docker-compose instead.
+.env
+.env.*
+!.env.example
+
+# Docker files themselves are not needed inside the build context.
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.override.yml
+docker-start.sh
+docker-start.cmd
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

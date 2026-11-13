@@ -1,0 +1,15 @@
+# Normalize text files on commit.
+* text=auto
+
+# These must keep LF endings: CRLF breaks the Docker build and makes shell
+# scripts fail with "bad interpreter" on macOS / Linux.
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.sh            text eol=lf
+.env.example    text eol=lf
+
+# Windows batch files need CRLF.
+*.cmd           text eol=crlf
+*.bat           text eol=crlf

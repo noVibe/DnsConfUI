@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# DnsConf UI — local deployment
+#
+#   1. copy .env.example to .env
+#   2. put your GitHub OAuth Client ID into .env
+#   3. docker compose up --build
+#
+# Then open http://localhost:3000
+# ---------------------------------------------------------------------------
+
+services:
+  dnsconf-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Read from the .env file next to this file. Docker Compose stops with
+        # the message below if the value is missing.
+        NEXT_PUBLIC_GITHUB_CLIENT_ID: '${NEXT_PUBLIC_GITHUB_CLIENT_ID:?Missing NEXT_PUBLIC_GITHUB_CLIENT_ID. Copy .env.example to .env and put your GitHub OAuth App Client ID there - see DOCKER.md}'
+
+    image: dnsconf-ui:local
+    container_name: dnsconf-ui
+
+    # The server routes read the Client ID at runtime as well.
+    environment:
+      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID}
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+    ports:
+      # HOST_PORT is the port on your own machine; change it in .env if 3000
+      # is already taken.
+      - "${HOST_PORT:-3000}:3000"
+
+    restart: unless-stopped
+
+    # The app has no database and stores nothing, so it needs no volumes.
+    security_opt:
+      - no-new-privileges:true

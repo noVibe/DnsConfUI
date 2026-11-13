@@ -217,7 +217,7 @@ export const locale = {
   "auth.devSetup": "Developer setup required",
   "auth.devSetupDesc": "This local preview is missing the public GitHub client ID. In production, users do not create OAuth apps or configure GitHub developer settings; they only press Connect GitHub and approve access.",
   "auth.envVar": "NEXT_PUBLIC_GITHUB_CLIENT_ID=your_client_id",
-  "auth.localDevDesc": "For local development, the app owner creates one GitHub OAuth App, enables Device Flow for it, and puts its client ID in .env.local.",
+  "auth.localDevDesc": "For a local setup, the app owner creates one GitHub OAuth App, enables Device Flow for it, and puts its client ID in .env (Docker) or .env.local (npm run dev). After editing .env, restart with: docker compose up --build -d",
   "auth.openGhDev": "Open GitHub developer settings",
   "auth.enterCode": "Enter this code on GitHub",
   "auth.copied": "Copied!",

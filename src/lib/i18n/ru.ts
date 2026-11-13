@@ -219,7 +219,7 @@ export const locale: Record<LocaleKey, string> = {
   "auth.devSetup": "Требуется настройка разработчика",
   "auth.devSetupDesc": "В этой локальной версии отсутствует публичный GitHub client ID. В продакшене пользователи не создают OAuth-приложения и не настраивают GitHub developer settings — они просто нажимают «Подключить GitHub» и подтверждают доступ.",
   "auth.envVar": "NEXT_PUBLIC_GITHUB_CLIENT_ID=your_client_id",
-  "auth.localDevDesc": "Для локальной разработки владелец приложения создаёт одно GitHub OAuth App, включает Device Flow и указывает его client ID в .env.local.",
+  "auth.localDevDesc": "При локальной установке владелец приложения создаёт одно GitHub OAuth App, включает Device Flow и указывает его client ID в .env (Docker) или .env.local (npm run dev). После правки .env перезапустите: docker compose up --build -d",
   "auth.openGhDev": "Открыть настройки разработчика GitHub",
   "auth.enterCode": "Введите этот код на GitHub",
   "auth.copied": "Скопировано!",

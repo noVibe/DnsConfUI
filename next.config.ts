@@ -42,6 +42,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Bundles the server together with only the dependencies it actually needs.
+  // The Docker runtime stage copies this bundle out of the build.
+  output: "standalone",
   allowedDevOrigins: isDev ? getLocalOrigins() : undefined,
   async headers() {
     return [
