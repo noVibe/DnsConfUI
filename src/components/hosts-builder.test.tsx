@@ -46,8 +46,11 @@ function resolveResponse(body: { donors: string[]; hostnames: string[] }): Respo
   });
 }
 
+/** Which donor supplies the address for a hostname in a held batch; `null` leaves it without one. */
+type Answer = string | null | ((hostname: string) => string | null);
+
 /** One batch, as the component asked for it, with its answer held back until the test lets it through. */
-type Batch = { donors: string[]; hostnames: string[]; respond: () => void };
+type Batch = { donors: string[]; hostnames: string[]; answer: (by: Answer) => void };
 
 /**
  * Eleven latencies for the eleven presets, so the pre-run ranking picks a known four, fastest first: the order the
@@ -85,15 +88,33 @@ function withLatencies() {
 }
 
 /**
- * Holds every batch until the test releases it, with `donor` supplying the address for all of its hostnames, so a
- * test can see exactly which order the component sent and what it does with the answer.
+ * Holds every batch until the test answers it, so a test can see exactly which donors the component sent and what
+ * it does with the answer. The answering donor is chosen per batch, and answering with `null` leaves the whole
+ * batch without an address, which is what sends its hostnames into the sweep. Aborting rejects, as fetch does.
  */
-function heldBatches(donor: string): Batch[] {
+function heldBatches(): Batch[] {
   const pending: Batch[] = [];
   fetchMock.mockImplementation((url: string, init: RequestInit) => {
-    const body = JSON.parse(String(init.body));
-    return new Promise<Response>((resolve) => {
-      pending.push({ donors: body.donors, hostnames: body.hostnames, respond: () => resolve(answeredBy(donor, body)) });
+    const body = JSON.parse(String(init.body)) as { donors: string[]; hostnames: string[] };
+    return new Promise<Response>((resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      pending.push({
+        donors: body.donors,
+        hostnames: body.hostnames,
+        answer: (by) => {
+          const donorOf = typeof by === "function" ? by : () => by;
+          resolve(
+            jsonResponse({
+              results: body.hostnames.map((hostname) => {
+                const donor = donorOf(hostname);
+                return donor === null
+                  ? { hostname, ip: null, ms: null, donor: null }
+                  : { hostname, ip: ipFor(hostname), ms: 70, donor };
+              })
+            })
+          );
+        }
+      });
     });
   });
   return pending;
@@ -236,53 +257,197 @@ describe("HostsBuilder", () => {
     expect(callsTo("/api/hosts/resolve")[0].donors).toEqual(FASTEST);
   });
 
-  it("puts the donor that is actually resolving in front of the later batches, dropping none of them", async () => {
+  it("narrows the batches after discovery to the two donors with the best coverage", async () => {
     withLatencies();
     // The measured shape of the defect: the third-fastest donor is the one that covers the file.
-    const pending = heldBatches(FASTEST[2]);
+    const pending = heldBatches();
     renderBuilder();
     await uploadBase(manyHosts(120), "big");
 
     start();
 
-    // Both batches in flight were dispatched before any answer, so both go out in the latency order.
+    // The two batches in flight are the discovery pass: dispatched before any answer, nothing about coverage is
+    // known yet, so both carry the whole ranked list in the latency order.
     await waitFor(() => expect(pending).toHaveLength(2));
     expect(pending[0].donors).toEqual(FASTEST);
     expect(pending[1].donors).toEqual(FASTEST);
 
-    pending[0].respond();
+    pending[0].answer(FASTEST[2]);
 
     await waitFor(() => expect(pending).toHaveLength(3));
-    // The donor that answered all fifty leads; the two ahead of it were walked and missed on every one of them.
-    // The fourth was never reached, so it is still unobserved and keeps its place ahead of the two that missed.
-    expect(pending[2].donors).toEqual([FASTEST[2], FASTEST[3], FASTEST[0], FASTEST[1]]);
-    // Reordered, never shortened: the donors that missed these fifty may be the only ones covering others.
-    expect([...pending[2].donors].sort()).toEqual([...FASTEST].sort());
+    // Discovery is over, so only the best two by coverage are asked: the donor that answered all fifty, and the
+    // one that was never reached, since an unobserved donor is better odds than the two that missed every name.
+    // The twenty-second saving the measurement found is exactly these two attempts that are no longer made.
+    expect(pending[2].donors).toEqual([FASTEST[2], FASTEST[3]]);
 
-    pending[1].respond();
-    pending[2].respond();
+    pending[1].answer(FASTEST[2]);
+    pending[2].answer(FASTEST[2]);
     await screen.findByRole("link", { name: "Скачать файл hosts" });
   });
 
   it("keeps a donor nothing is known about yet ahead of one that was asked and missed", async () => {
     withLatencies();
-    const pending = heldBatches(FASTEST[1]);
+    const pending = heldBatches();
     renderBuilder();
     await uploadBase(manyHosts(120), "big");
 
     start();
 
     await waitFor(() => expect(pending).toHaveLength(2));
-    pending[0].respond();
+    pending[0].answer(FASTEST[1]);
 
     await waitFor(() => expect(pending).toHaveLength(3));
     // Only the second-fastest has a record: the fastest missed all fifty, the last two were never reached. An
-    // unobserved donor is worth trying before a demonstrated miss, so it must not fall to the back of the walk.
-    expect(pending[2].donors).toEqual([FASTEST[1], FASTEST[2], FASTEST[3], FASTEST[0]]);
+    // unobserved donor is worth trying before a demonstrated miss, so it is the second of the narrowed pair.
+    expect(pending[2].donors).toEqual([FASTEST[1], FASTEST[2]]);
 
-    pending[1].respond();
-    pending[2].respond();
+    pending[1].answer(FASTEST[1]);
+    pending[2].answer(FASTEST[1]);
     await screen.findByRole("link", { name: "Скачать файл hosts" });
+  });
+
+  it("re-picks the narrowed pair from the tally instead of trusting the first leader to the end", async () => {
+    withLatencies();
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(manyHosts(200), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].answer(FASTEST[2]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    expect(pending[2].donors).toEqual([FASTEST[2], FASTEST[3]]);
+
+    // The second discovery batch says the fourth donor covers far more than the third, which had been leading
+    // only because it answered first. The next batch must go to the new pair, not to the one already chosen.
+    pending[1].answer(FASTEST[3]);
+    await waitFor(() => expect(pending).toHaveLength(4));
+    expect(pending[3].donors).toEqual([FASTEST[3], FASTEST[2]]);
+
+    pending[2].answer(FASTEST[3]);
+    pending[3].answer(FASTEST[3]);
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+  });
+
+  it("sweeps the domains the narrowed pass left without an address, asking only the donors it did not use", async () => {
+    withLatencies();
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].answer(FASTEST[2]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    expect(pending[2].donors).toEqual([FASTEST[2], FASTEST[3]]);
+    pending[1].answer(FASTEST[2]);
+    // The narrowed pair resolves none of the last twenty, which is the case narrowing has to be safe for.
+    pending[2].answer(null);
+
+    await waitFor(() => expect(pending).toHaveLength(4));
+    // Exactly the two donors the narrowed pass did not ask, so these twenty end the run having been put to all
+    // four once — the same total they paid when every batch carried the whole list.
+    expect(pending[3].donors).toEqual([FASTEST[0], FASTEST[1]]);
+    expect(pending[3].hostnames).toEqual(pending[2].hostnames);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Добираем оставшимися прокси домены, которые ещё без адреса…"
+    );
+    // Still counted as kept while the sweep is out: the counts describe the file as it stands, and the sweep can
+    // only move a domain from kept to resolved, never the other way.
+    expect(screen.getByRole("progressbar", { name: "Перепроверка доменов" })).toHaveAttribute(
+      "aria-valuetext",
+      "120 из 120 доменов: 100 с рабочим адресом, 20 оставили прежний"
+    );
+
+    pending[3].answer(FASTEST[0]);
+
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    // Resolved by the sweep, so resolved rose and kept fell to nothing; `resolved + kept` is still `done`.
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Готово: 120 из 120 доменов получили рабочий адрес, 0 оставили прежний."
+    );
+    expect(screen.getByRole("progressbar", { name: "Перепроверка доменов" })).toHaveAttribute(
+      "aria-valuetext",
+      "120 из 120 доменов: 120 с рабочим адресом, 0 оставили прежний"
+    );
+    // The donor that answered during the sweep is credited, and the table still sums to the total.
+    expect(screen.getByRole("row", { name: /MagicDNS 100/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /GeoHide US 20/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Оставили прежний адрес 0/ })).toBeInTheDocument();
+    // And the address it supplied is in the produced file, not just in the counts.
+    const produced = (await blobs[0].text()).split(CRLF);
+    expect(produced).toContain(`${ipFor("h119.example")} h119.example`);
+  });
+
+  it("does not sweep when the narrowed pass left nothing without an address", async () => {
+    withLatencies();
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].answer(FASTEST[2]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    pending[1].answer(FASTEST[2]);
+    pending[2].answer(FASTEST[2]);
+
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    expect(pending).toHaveLength(3);
+  });
+
+  it("does not sweep when the narrowed pass was already asking every donor it has", async () => {
+    // Only two donors answer the checks at all, so narrowing to two takes nothing away and leaves nothing over.
+    const answering = [DNS_DONORS[4].value, DNS_DONORS[6].value];
+    donorChecks.checkDonor.mockImplementation(async (donor: string) => ({
+      dnsMs: answering.includes(donor) ? 50 : null,
+      chatgptMs: 300,
+      country: "NL",
+      direct: false
+    }));
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].answer(answering[0]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    expect(pending[2].donors).toEqual(answering);
+    pending[1].answer(answering[0]);
+    pending[2].answer(null);
+
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    // The last twenty were walked through both donors already; there is no third to ask them.
+    expect(pending).toHaveLength(3);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Готово: 100 из 120 доменов получили рабочий адрес, 20 оставили прежний."
+    );
+  });
+
+  it("cancels a run while the sweep is out and still offers no file", async () => {
+    withLatencies();
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].answer(FASTEST[2]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    pending[1].answer(FASTEST[2]);
+    pending[2].answer(null);
+    await waitFor(() => expect(pending).toHaveLength(4));
+
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(await screen.findByText("Отменено. Файл не собран.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Скачать файл hosts" })).not.toBeInTheDocument();
   });
 
   it("starts a new run from the latency order instead of inheriting the last run's tally", async () => {

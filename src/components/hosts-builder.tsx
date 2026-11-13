@@ -30,16 +30,44 @@ const BATCH_SIZE = 50;
 const MAX_IN_FLIGHT = 2;
 /** More donors than this only lengthen the per-hostname walk the server does on a miss. */
 const MAX_DONORS = 4;
+/**
+ * How many domains go out under the full ranked donor list before the run narrows to the leaders.
+ *
+ * Nothing about coverage is known until batches come back, and a wrong guess is expensive: a measured GeoHide run
+ * had one donor cover 812 of 1040 domains and another cover 8, so the tally needs real answers under it before it
+ * can be trusted to pick two. A hundred domains is two batches — exactly the two that are already in flight before
+ * the first answer arrives — so discovery costs the run no round trip it was not making anyway.
+ */
+const DISCOVERY_DOMAINS = 100;
+const DISCOVERY_BATCHES = Math.ceil(DISCOVERY_DOMAINS / BATCH_SIZE);
+/**
+ * How many donors a batch carries once discovery is over.
+ *
+ * Measured against the live app, the same 50 domains came back identically resolved (41 of 50) whether one donor or
+ * four were sent — 6.7s against 27s. The cost is the number of attempts a hostname pays, not their order, and the
+ * three donors behind the leader added no coverage at all for that sample. Two keeps a second opinion for the
+ * domains the leader misses; whatever neither of them covers is finished off by the sweep, so nothing is lost.
+ */
+const NARROWED_DONORS = 2;
 const RETRY_BACKOFF_MS = 300;
 const MAX_RETRIES = 4;
 
-type Phase = "idle" | "loading" | "ready" | "ranking" | "resolving" | "done";
+type Phase = "idle" | "loading" | "ready" | "ranking" | "resolving" | "sweeping" | "done";
 type BaseKind = "list" | "url" | "file";
 type Mode = "auto" | "specific";
 
 type Base = { readonly parsed: ParsedHostsFile; readonly summary: HostsSummary; readonly origin: string };
 type Progress = { readonly total: number; readonly done: number; readonly resolved: number; readonly kept: number };
 type Resolved = { hostname: string; ip: string | null; ms: number | null; donor: string | null };
+
+/** One request's worth of work for the run loop. */
+type Job = {
+  readonly hostnames: string[];
+  /** The donors to send when the phase fixed them up front; `null` lets the dispatch pick from the live tally. */
+  readonly donors: readonly string[] | null;
+  /** Whether these hostnames are new work: a sweep re-asks hostnames the main pass has already counted as done. */
+  readonly fresh: boolean;
+};
 
 const NO_PROGRESS: Progress = { total: 0, done: 0, resolved: 0, kept: 0 };
 
@@ -50,7 +78,8 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 }
 
 /**
- * The donors with the better observed coverage first.
+ * The donors with the better observed coverage first, which is both who a batch asks first and who it asks at all:
+ * the narrowed pass sends the leading `NARROWED_DONORS` of this order and the sweep sends what is left of it.
  *
  * How fast a donor answers for one probe name says almost nothing about how much of a published list it can
  * resolve: a measured GeoHide run had the fastest donor cover 8 domains of 1040 and the third-fastest cover 812, so
@@ -248,7 +277,11 @@ export function HostsBuilder() {
       .map(({ donor }) => donor);
   }
 
-  async function resolveBatch(hostnames: string[], donors: string[], signal: AbortSignal): Promise<Resolved[]> {
+  async function resolveBatch(
+    hostnames: string[],
+    donors: readonly string[],
+    signal: AbortSignal
+  ): Promise<Resolved[]> {
     const missed = (): Resolved[] => hostnames.map((hostname) => ({ hostname, ip: null, ms: null, donor: null }));
     for (let attempt = 0; ; attempt++) {
       let response: Response;
@@ -304,14 +337,15 @@ export function HostsBuilder() {
     }
 
     setPhase("resolving");
-    const batches = chunk(names, BATCH_SIZE);
     const overrides = new Map<string, string>();
     // The tally is per run and lives here, in the run's own closure, so a new run starts clean with no reset to
     // forget. `answered` is the one count of who supplied an address: the attribution table renders it and the
     // ranking reads it, rather than two counters drifting apart. `asked` is how often a donor was walked at all.
     const answered = new Map<string, number>();
     const asked = new Map<string, number>();
-    let next = 0;
+    // Every hostname still without an address, against the donors it has already been walked through. The sweep
+    // reads it to ask each one the donors it is still owed, and a hostname leaves it the moment one answers.
+    const outstanding = new Map<string, readonly string[]>();
 
     /**
      * Charges one hostname's attempts. The server walks the donors in the order it was sent and stops at the first
@@ -324,36 +358,92 @@ export function HostsBuilder() {
       for (const donor of order.slice(0, walked)) asked.set(donor, (asked.get(donor) ?? 0) + 1);
     };
 
-    const worker = async () => {
-      while (next < batches.length) {
-        const batch = batches[next++];
-        // Both the cursor and the order are read in this one synchronous step, before the next await: whatever the
-        // batches that have already answered taught is in the tally by now, so the two workers sharing the cursor
-        // always dispatch with the current order, and a reorder reaches every batch sent after it.
-        const order = byCoverage(donors, answered, asked);
-        const results = await resolveBatch(batch, order, controller.signal);
-        let resolved = 0;
-        for (const row of results) {
-          if (typeof row?.hostname !== "string") continue;
-          if (typeof row.ip === "string") {
-            overrides.set(row.hostname, row.ip);
-            resolved += 1;
-            if (row.donor) answered.set(row.donor, (answered.get(row.donor) ?? 0) + 1);
+    /**
+     * What a main-pass batch asks. Discovery sends the whole ranked list, because nothing is known yet; after that
+     * only the leading pair, re-picked here from the tally every time, so a leader that degrades is replaced
+     * rather than trusted to the end of the run.
+     */
+    const donorsForBatch = (index: number) => {
+      const ranked = byCoverage(donors, answered, asked);
+      return index < DISCOVERY_BATCHES ? ranked : ranked.slice(0, NARROWED_DONORS);
+    };
+
+    /** Runs a list of jobs `MAX_IN_FLIGHT` at a time, each with the donors it is due at the moment it goes out. */
+    const pump = async (jobs: readonly Job[]) => {
+      let next = 0;
+      const worker = async () => {
+        while (next < jobs.length) {
+          const index = next++;
+          const job = jobs[index];
+          // Both the cursor and the donors are read in this one synchronous step, before the next await: whatever
+          // the batches that have already answered taught is in the tally by now, so the two workers sharing the
+          // cursor always dispatch with the current narrowed pair, and a change of pair reaches every later batch.
+          const order = job.donors ?? donorsForBatch(index);
+          const results = await resolveBatch(job.hostnames, order, controller.signal);
+          // Recorded before the rows are read, so a hostname the server left out of its answer is still owed the
+          // rest of the walk rather than quietly dropped from the sweep.
+          for (const hostname of job.hostnames) {
+            const walked = outstanding.get(hostname);
+            outstanding.set(hostname, walked ? [...new Set([...walked, ...order])] : [...order]);
           }
-          charge(order, typeof row.ip === "string" ? row.donor : null);
+          let resolved = 0;
+          for (const row of results) {
+            if (typeof row?.hostname !== "string") continue;
+            if (typeof row.ip === "string") {
+              overrides.set(row.hostname, row.ip);
+              outstanding.delete(row.hostname);
+              resolved += 1;
+              if (row.donor) answered.set(row.donor, (answered.get(row.donor) ?? 0) + 1);
+            }
+            charge(order, typeof row.ip === "string" ? row.donor : null);
+          }
+          // A sweep re-asks hostnames the main pass already counted, so it moves them from kept to resolved
+          // instead of adding to `done`: `resolved + kept` stays equal to `done`, and neither of them ever drops.
+          setProgress((current) => ({
+            total: current.total,
+            done: current.done + (job.fresh ? job.hostnames.length : 0),
+            resolved: current.resolved + resolved,
+            kept: job.fresh ? current.kept + job.hostnames.length - resolved : current.kept - resolved
+          }));
+          setDonorCounts([...answered]);
         }
-        setProgress((current) => ({
-          total: current.total,
-          done: current.done + batch.length,
-          resolved: current.resolved + resolved,
-          kept: current.kept + batch.length - resolved
-        }));
-        setDonorCounts([...answered]);
+      };
+      await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, jobs.length) }, worker));
+    };
+
+    /**
+     * The batches that finish the walk the narrowed pass cut short.
+     *
+     * A hostname with no address was walked through every donor its batch carried, so the donors it has not been
+     * asked are exactly the ranked ones missing from its entry in `outstanding`. Asking those, and only those, is
+     * what makes narrowing safe: a hostname nobody resolves still ends the run having been put to every ranked
+     * donor once — the same total it paid when every batch carried the whole list — and a donor that is the only
+     * one covering a handful of domains still gets its turn at them. Hostnames narrowed to different pairs owe
+     * different donors, so they are grouped by what they are owed rather than swept under one list.
+     */
+    const sweepJobs = (): Job[] => {
+      const ranked = byCoverage(donors, answered, asked);
+      const groups = new Map<string, { donors: readonly string[]; hostnames: string[] }>();
+      for (const [hostname, walked] of outstanding) {
+        const owed = ranked.filter((candidate) => !walked.includes(candidate));
+        if (owed.length === 0) continue;
+        const key = owed.join(" ");
+        const group = groups.get(key) ?? { donors: owed, hostnames: [] };
+        group.hostnames.push(hostname);
+        groups.set(key, group);
       }
+      return [...groups.values()].flatMap((group) =>
+        chunk(group.hostnames, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: group.donors, fresh: false }))
+      );
     };
 
     try {
-      await Promise.all(Array.from({ length: Math.min(MAX_IN_FLIGHT, batches.length) }, worker));
+      await pump(chunk(names, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: null, fresh: true })));
+      const sweep = sweepJobs();
+      if (sweep.length > 0) {
+        setPhase("sweeping");
+        await pump(sweep);
+      }
     } catch {
       setCancelled(true);
       setPhase("ready");
@@ -368,7 +458,8 @@ export function HostsBuilder() {
     runRef.current?.abort();
   }
 
-  const running = phase === "loading" || phase === "ranking" || phase === "resolving";
+  const resolving = phase === "resolving" || phase === "sweeping";
+  const running = phase === "loading" || phase === "ranking" || resolving;
   const status =
     phase === "loading"
       ? t("hosts.loading")
@@ -376,13 +467,15 @@ export function HostsBuilder() {
         ? t("hosts.phase.ranking")
         : phase === "resolving"
           ? t("hosts.phase.resolving")
-          : phase === "done"
-            ? t("hosts.done", { resolved: progress.resolved, total: progress.total, kept: progress.kept })
-            : noDonors
-              ? t("hosts.phase.noDonors")
-              : cancelled
-                ? t("hosts.phase.cancelled")
-                : "";
+          : phase === "sweeping"
+            ? t("hosts.phase.sweeping")
+            : phase === "done"
+              ? t("hosts.done", { resolved: progress.resolved, total: progress.total, kept: progress.kept })
+              : noDonors
+                ? t("hosts.phase.noDonors")
+                : cancelled
+                  ? t("hosts.phase.cancelled")
+                  : "";
   const progressText = t("hosts.progress.text", {
     done: progress.done,
     total: progress.total,
@@ -529,7 +622,7 @@ export function HostsBuilder() {
           {running ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
           {t("hosts.start")}
         </Button>
-        {phase === "ranking" || phase === "resolving" ? (
+        {phase === "ranking" || resolving ? (
           <SecondaryButton type="button" onClick={cancel} className="min-h-9 px-3 py-1.5 text-xs">
             {t("common.cancel")}
           </SecondaryButton>
@@ -549,7 +642,7 @@ export function HostsBuilder() {
       <p role="status" className="mt-3 text-xs text-ink/70">
         {status}
       </p>
-      {retried && phase === "resolving" ? <p className="mt-1 text-xs text-ink/50">{t("hosts.phase.retrying")}</p> : null}
+      {retried && resolving ? <p className="mt-1 text-xs text-ink/50">{t("hosts.phase.retrying")}</p> : null}
 
       {progress.total > 0 ? (
         <div className="mt-2">
