@@ -46,6 +46,21 @@ function resolveResponse(body: { donors: string[]; hostnames: string[] }): Respo
   });
 }
 
+/** One batch, as the component asked for it, with its answer held back until the test lets it through. */
+type Batch = { donors: string[]; hostnames: string[]; respond: () => void };
+
+/**
+ * Eleven latencies for the eleven presets, so the pre-run ranking picks a known four, fastest first: the order the
+ * run starts from and the one the coverage ranking has to move away from.
+ */
+const DNS_MS: readonly (number | null)[] = [null, 300, 50, null, 120, 90, 200, 400, 410, 420, 430];
+const FASTEST = [DNS_DONORS[2].value, DNS_DONORS[5].value, DNS_DONORS[4].value, DNS_DONORS[6].value];
+
+/** Answers every hostname in the batch with the given donor, whatever place the component gave it in the walk. */
+function answeredBy(donor: string, body: { hostnames: string[] }): Response {
+  return jsonResponse({ results: body.hostnames.map((hostname) => ({ hostname, ip: ipFor(hostname), ms: 70, donor })) });
+}
+
 const fetchMock = vi.fn();
 const blobs: Blob[] = [];
 const revoke = vi.fn();
@@ -56,6 +71,32 @@ function requestBody(call: unknown[]): any {
 
 function callsTo(url: string): any[] {
   return fetchMock.mock.calls.filter((call) => call[0] === url).map(requestBody);
+}
+
+/** Puts `DNS_MS` behind the donor checks, so the run starts in the `FASTEST` order. */
+function withLatencies() {
+  const dnsMsOf = new Map(DNS_DONORS.map((donor, index) => [donor.value, DNS_MS[index]]));
+  donorChecks.checkDonor.mockImplementation(async (donor: string) => ({
+    dnsMs: dnsMsOf.get(donor) ?? null,
+    chatgptMs: 300,
+    country: "NL",
+    direct: false
+  }));
+}
+
+/**
+ * Holds every batch until the test releases it, with `donor` supplying the address for all of its hostnames, so a
+ * test can see exactly which order the component sent and what it does with the answer.
+ */
+function heldBatches(donor: string): Batch[] {
+  const pending: Batch[] = [];
+  fetchMock.mockImplementation((url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    return new Promise<Response>((resolve) => {
+      pending.push({ donors: body.donors, hostnames: body.hostnames, respond: () => resolve(answeredBy(donor, body)) });
+    });
+  });
+  return pending;
 }
 
 function renderBuilder() {
@@ -183,14 +224,7 @@ describe("HostsBuilder", () => {
   });
 
   it("ranks the donors by measured latency before resolving and sends the best four, fastest first", async () => {
-    const latencies: (number | null)[] = [null, 300, 50, null, 120, 90, 200, 400, 410, 420, 430];
-    const dnsMsOf = new Map(DNS_DONORS.map((donor, index) => [donor.value, latencies[index]]));
-    donorChecks.checkDonor.mockImplementation(async (donor: string) => ({
-      dnsMs: dnsMsOf.get(donor) ?? null,
-      chatgptMs: 300,
-      country: "NL",
-      direct: false
-    }));
+    withLatencies();
     renderBuilder();
     await uploadBase();
 
@@ -198,12 +232,80 @@ describe("HostsBuilder", () => {
 
     expect(await screen.findByText("Проверяем, какие DNS-прокси отвечают…")).toBeInTheDocument();
     await screen.findByRole("link", { name: "Скачать файл hosts" });
-    expect(callsTo("/api/hosts/resolve")[0].donors).toEqual([
-      DNS_DONORS[2].value,
-      DNS_DONORS[5].value,
-      DNS_DONORS[4].value,
-      DNS_DONORS[6].value
-    ]);
+    // Nothing is known about coverage before the first answer, so latency is all the first batch can go on.
+    expect(callsTo("/api/hosts/resolve")[0].donors).toEqual(FASTEST);
+  });
+
+  it("puts the donor that is actually resolving in front of the later batches, dropping none of them", async () => {
+    withLatencies();
+    // The measured shape of the defect: the third-fastest donor is the one that covers the file.
+    const pending = heldBatches(FASTEST[2]);
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    // Both batches in flight were dispatched before any answer, so both go out in the latency order.
+    await waitFor(() => expect(pending).toHaveLength(2));
+    expect(pending[0].donors).toEqual(FASTEST);
+    expect(pending[1].donors).toEqual(FASTEST);
+
+    pending[0].respond();
+
+    await waitFor(() => expect(pending).toHaveLength(3));
+    // The donor that answered all fifty leads; the two ahead of it were walked and missed on every one of them.
+    // The fourth was never reached, so it is still unobserved and keeps its place ahead of the two that missed.
+    expect(pending[2].donors).toEqual([FASTEST[2], FASTEST[3], FASTEST[0], FASTEST[1]]);
+    // Reordered, never shortened: the donors that missed these fifty may be the only ones covering others.
+    expect([...pending[2].donors].sort()).toEqual([...FASTEST].sort());
+
+    pending[1].respond();
+    pending[2].respond();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+  });
+
+  it("keeps a donor nothing is known about yet ahead of one that was asked and missed", async () => {
+    withLatencies();
+    const pending = heldBatches(FASTEST[1]);
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].respond();
+
+    await waitFor(() => expect(pending).toHaveLength(3));
+    // Only the second-fastest has a record: the fastest missed all fifty, the last two were never reached. An
+    // unobserved donor is worth trying before a demonstrated miss, so it must not fall to the back of the walk.
+    expect(pending[2].donors).toEqual([FASTEST[1], FASTEST[2], FASTEST[3], FASTEST[0]]);
+
+    pending[1].respond();
+    pending[2].respond();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+  });
+
+  it("starts a new run from the latency order instead of inheriting the last run's tally", async () => {
+    withLatencies();
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
+      answeredBy(FASTEST[2], JSON.parse(String(init.body)))
+    );
+    renderBuilder();
+    await uploadBase(manyHosts(120), "big");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    const firstRun = callsTo("/api/hosts/resolve");
+    expect(firstRun).toHaveLength(3);
+    expect(firstRun[2].donors[0]).toBe(FASTEST[2]);
+
+    start();
+
+    await waitFor(() => expect(callsTo("/api/hosts/resolve")).toHaveLength(6));
+    // What the previous run learned is gone with it: donors may have changed places since, so the second run
+    // starts over from its own fresh checks.
+    expect(callsTo("/api/hosts/resolve")[3].donors).toEqual(FASTEST);
+    expect(callsTo("/api/hosts/resolve")[5].donors[0]).toBe(FASTEST[2]);
   });
 
   it("stops with a message when no donor answers at all", async () => {

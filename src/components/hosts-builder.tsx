@@ -49,6 +49,30 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return batches;
 }
 
+/**
+ * The donors with the better observed coverage first.
+ *
+ * How fast a donor answers for one probe name says almost nothing about how much of a published list it can
+ * resolve: a measured GeoHide run had the fastest donor cover 8 domains of 1040 and the third-fastest cover 812, so
+ * nearly every domain paid two failed DNS lookups before the one that answers. Once batches come back, how many
+ * hostnames a donor actually supplied is known, and that is what the order is built from instead.
+ *
+ * The rate is smoothed — `(resolved + 1) / (asked + 2)` — which is what makes it behave with few observations. A
+ * donor nothing is known about yet scores as even money: behind one that is answering, ahead of one that has been
+ * asked and missed, so it is still tried rather than buried, and one early success cannot pin the order for the
+ * rest of the run. The sort is stable, so donors on equal terms keep the order they came in with, which is why the
+ * first batch goes out in the latency order and nothing else needs a special case.
+ */
+function byCoverage(
+  donors: readonly string[],
+  answered: ReadonlyMap<string, number>,
+  asked: ReadonlyMap<string, number>
+): string[] {
+  const rate = (donor: string) => ((answered.get(donor) ?? 0) + 1) / ((asked.get(donor) ?? 0) + 2);
+  // Reordered, never shortened: the donor that resolves the fewest domains may be the only one that covers them.
+  return [...donors].sort((a, b) => rate(b) - rate(a));
+}
+
 /** Never resolves: it rejects as soon as the run is cancelled, so an await can race a step against the cancel. */
 function cancellation(signal: AbortSignal): Promise<never> {
   return new Promise((_resolve, reject) => {
@@ -209,8 +233,9 @@ export function HostsBuilder() {
   }
 
   /**
-   * Ranking before resolving, not during: the server walks the donors in the given order for every hostname, so a
-   * dead donor in front would cost its DNS timeout on each of a thousand domains.
+   * The order the run starts from: the server walks the donors in the given order for every hostname, so a dead
+   * donor in front would cost its DNS timeout on each of a thousand domains. Latency is all there is to go on
+   * before the first results; from then on `byCoverage` reorders by what the donors actually resolved.
    */
   async function rankDonors(signal: AbortSignal): Promise<string[]> {
     // The checks report themselves when they are all in, so there is nothing to poll and no ceiling to truncate a
@@ -281,19 +306,41 @@ export function HostsBuilder() {
     setPhase("resolving");
     const batches = chunk(names, BATCH_SIZE);
     const overrides = new Map<string, string>();
+    // The tally is per run and lives here, in the run's own closure, so a new run starts clean with no reset to
+    // forget. `answered` is the one count of who supplied an address: the attribution table renders it and the
+    // ranking reads it, rather than two counters drifting apart. `asked` is how often a donor was walked at all.
     const answered = new Map<string, number>();
+    const asked = new Map<string, number>();
     let next = 0;
+
+    /**
+     * Charges one hostname's attempts. The server walks the donors in the order it was sent and stops at the first
+     * one that supplies a working address, so the donor that answered and every donor ahead of it were asked; a
+     * row with no address was asked of all of them.
+     */
+    const charge = (order: readonly string[], answeredBy: string | null) => {
+      const found = answeredBy === null ? -1 : order.indexOf(answeredBy);
+      const walked = found < 0 ? order.length : found + 1;
+      for (const donor of order.slice(0, walked)) asked.set(donor, (asked.get(donor) ?? 0) + 1);
+    };
 
     const worker = async () => {
       while (next < batches.length) {
         const batch = batches[next++];
-        const results = await resolveBatch(batch, donors, controller.signal);
+        // Both the cursor and the order are read in this one synchronous step, before the next await: whatever the
+        // batches that have already answered taught is in the tally by now, so the two workers sharing the cursor
+        // always dispatch with the current order, and a reorder reaches every batch sent after it.
+        const order = byCoverage(donors, answered, asked);
+        const results = await resolveBatch(batch, order, controller.signal);
         let resolved = 0;
         for (const row of results) {
-          if (typeof row?.ip !== "string" || typeof row?.hostname !== "string") continue;
-          overrides.set(row.hostname, row.ip);
-          resolved += 1;
-          if (row.donor) answered.set(row.donor, (answered.get(row.donor) ?? 0) + 1);
+          if (typeof row?.hostname !== "string") continue;
+          if (typeof row.ip === "string") {
+            overrides.set(row.hostname, row.ip);
+            resolved += 1;
+            if (row.donor) answered.set(row.donor, (answered.get(row.donor) ?? 0) + 1);
+          }
+          charge(order, typeof row.ip === "string" ? row.donor : null);
         }
         setProgress((current) => ({
           total: current.total,

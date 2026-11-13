@@ -29,15 +29,34 @@ const requestSchema = z.object({
 type Resolved = { hostname: string; ip: string | null; ms: number | null; donor: string | null };
 
 /**
- * Per-request knowledge about the proxy addresses the donors hand out.
+ * Per-request knowledge about the donors and the proxy addresses they hand out.
  *
  * A failed probe is cached: an address that does not complete a handshake is dead regardless of hostname, so later
  * hostnames skip it. A successful one is not, because a proxy may serve one domain and not another and the
  * certificate check is per hostname; the counts only decide which candidate is tried first.
+ *
+ * Donors are scored the same way and for the same reason, one step up: a donor that has been supplying working
+ * addresses for this batch is asked before one that has been failing on it, so the names later in the batch stop
+ * paying for a walk the earlier ones already showed to be fruitless. A donor is only reordered, never skipped —
+ * donors do not cover the same domains — and an untried donor sits at zero, ahead of any donor that has missed.
  */
 class AddressRecord {
   private readonly dead = new Set<string>();
   private readonly score = new Map<string, number>();
+  private readonly donors = new Map<string, number>();
+
+  donorSupplied(donor: string) {
+    this.donors.set(donor, (this.donors.get(donor) ?? 0) + 1);
+  }
+
+  donorMissed(donor: string) {
+    this.donors.set(donor, (this.donors.get(donor) ?? 0) - 1);
+  }
+
+  /** Donors with the better record in this request first, so a hostname's walk usually ends at the first one. */
+  rankDonors(donors: readonly string[]): string[] {
+    return [...donors].sort((a, b) => (this.donors.get(b) ?? 0) - (this.donors.get(a) ?? 0));
+  }
 
   isDead(ip: string): boolean {
     return this.dead.has(ip);
@@ -65,11 +84,12 @@ async function resolveHostname(hostname: string, donors: string[], record: Addre
   // the answer with no address, exactly like a name every donor failed on.
   if (!isResolvableHostname(hostname)) return unresolved(hostname);
 
-  for (const donor of donors) {
+  for (const donor of record.rankDonors(donors)) {
     let answers: string[];
     try {
       answers = await resolveA(donor, hostname, DNS_TIMEOUT_MS);
     } catch {
+      record.donorMissed(donor);
       continue;
     }
     // Some donors answer with no A records for a name another donor resolves, which is why the walk exists:
@@ -90,8 +110,11 @@ async function resolveHostname(hostname: string, donors: string[], record: Addre
         continue;
       }
       record.succeeded(ip);
+      record.donorSupplied(donor);
       return { hostname, ip, ms: probe.ms, donor };
     }
+    // Answered but nothing usable came of it, which for this hostname is the same as not answering.
+    record.donorMissed(donor);
   }
   return unresolved(hostname);
 }
