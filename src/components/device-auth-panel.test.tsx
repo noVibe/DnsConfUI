@@ -32,8 +32,8 @@ vi.mock("@/domain/github-app", async (importOriginal) => {
 });
 
 const originalClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
-const sharedAppTitle = "Вы входите через общее GitHub-приложение проекта";
-const ownAppTitle = "Вы входите через своё GitHub-приложение";
+const sharedAppTitle = "Вход по общему ключу проекта";
+const ownAppTitle = "Вход по вашему ключу";
 const startAuthorization = "Начать подключение к GitHub";
 const OWN_CLIENT_ID = "Ov23liOwnAppClientId";
 
@@ -92,7 +92,7 @@ describe("DeviceAuthPanel", () => {
 
     renderPanel();
 
-    expect(screen.getByText("Нет GitHub-приложения для входа")).toBeInTheDocument();
+    expect(screen.getByText("Нет ключа для входа")).toBeInTheDocument();
     expect(screen.getByLabelText("Client ID вашего OAuth App")).toBeInTheDocument();
     expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: startAuthorization })).not.toBeInTheDocument();
@@ -103,11 +103,11 @@ describe("DeviceAuthPanel", () => {
 
     renderPanel();
 
-    // The notice is one line until it is asked for: the detail is in the document but not on the screen.
+    // The notice is one line until it is asked for: the three points are in the document but not on the screen.
     expect(screen.getByText(sharedAppTitle)).toBeVisible();
-    expect(screen.getByText(/имя владельца проекта/)).not.toBeVisible();
-    expect(screen.getByText(/50 в час/)).not.toBeVisible();
-    expect(screen.getByText(/не сохраняет ваш GitHub-токен/)).not.toBeVisible();
+    expect(screen.getByText(/общий ключ проекта/)).not.toBeVisible();
+    expect(screen.getByText(/50 кодов в час/)).not.toBeVisible();
+    expect(screen.getByText(/заведите свой ключ/)).not.toBeVisible();
     expect(screen.getByRole("button", { name: startAuthorization })).toBeVisible();
   });
 
@@ -143,7 +143,7 @@ describe("DeviceAuthPanel", () => {
 
     expect(screen.getByText(ownAppTitle)).toBeInTheDocument();
     expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
-    expect(screen.getByText(`Используется ваш client ID: ${OWN_CLIENT_ID}.`)).toBeInTheDocument();
+    expect(screen.getByText(`Используется ваш ключ: ${OWN_CLIENT_ID}.`)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: startAuthorization }));
 
@@ -169,7 +169,7 @@ describe("DeviceAuthPanel", () => {
 
     renderPanel();
     applyOwnClientId();
-    fireEvent.click(screen.getByRole("button", { name: "вернуться к общему приложению" }));
+    fireEvent.click(screen.getByRole("button", { name: "вернуться к общему ключу" }));
 
     expect(screen.getByText(sharedAppTitle)).toBeInTheDocument();
     expect(screen.getByLabelText("Client ID вашего OAuth App")).toHaveValue("");

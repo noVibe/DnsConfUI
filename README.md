@@ -86,8 +86,7 @@ To use an app of your own instead:
 1. Create a GitHub OAuth App at https://github.com/settings/developers
 2. Enable **Device Flow** for the app
 3. Paste its **Client ID** into the field on the app's own start screen, under
-   *"You are signing in through the project's shared GitHub app" → "Use an app
-   of your own"*
+   *"Signing in with the project's shared key"*
 
 That takes effect immediately and is remembered in your browser: no rebuild, no
 restart, no environment variable. The Client ID is not a secret — it is part of

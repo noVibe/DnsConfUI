@@ -43,10 +43,10 @@ To use your own OAuth App instead — a one-time, one-minute setup:
 The Client ID is not a secret — it is meant to be visible in the browser.
 Do **not** create a client secret; this app never uses one.
 
-Then paste it into the app itself: on the start screen open **"You are signing
-in through the project's shared GitHub app"** → **Use an app of your own**, put
-the Client ID in the field and apply it. It takes effect at once, is remembered
-in your browser, and needs no rebuild and no restart.
+Then paste it into the app itself: on the start screen open **"Signing in with
+the project's shared key"**, put the Client ID in the field and apply it. It
+takes effect at once, is remembered in your browser, and needs no rebuild and
+no restart.
 
 The same ID can be compiled into the image instead, through `.env` as shown in
 Step 3 — but that way needs a rebuild every time it changes.
@@ -249,10 +249,9 @@ Client ID не является секретом — он и так виден �
 создавать не нужно, приложение его не использует.
 
 Дальше вставьте его прямо в приложении: на начальном экране раскройте
-**«Вы входите через общее GitHub-приложение проекта»** → **«Использовать своё
-приложение»**, впишите Client ID в поле и нажмите «Применить». Он начнёт
-действовать сразу и запомнится в браузере — пересобирать и перезапускать ничего
-не нужно.
+**«Вход по общему ключу проекта»**, впишите Client ID в поле и нажмите
+«Применить». Он начнёт действовать сразу и запомнится в браузере — пересобирать
+и перезапускать ничего не нужно.
 
 Тот же ID можно вшить в образ через `.env` (шаг 3), но при таком способе после
 каждого изменения нужна пересборка.

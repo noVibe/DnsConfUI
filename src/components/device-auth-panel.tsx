@@ -170,15 +170,10 @@ export function DeviceAuthPanel() {
     }, interval * 1000);
   }
 
-  /** The field that points the app at an OAuth App of the user's own, with the three steps that produce one. */
+  /** The field that points the app at an OAuth App of the user's own. */
   function clientIdForm() {
     return (
-      <div className="mt-2 space-y-2">
-        <ol className="list-decimal space-y-1 pl-5 text-sm leading-6 text-ink/72">
-          <li>{t('auth.app.step1')}</li>
-          <li>{t('auth.app.step2')}</li>
-          <li>{t('auth.app.step3')}</li>
-        </ol>
+      <div className="mt-3 space-y-2">
         <a
           className="inline-flex min-h-9 items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:border-steel"
           href="https://github.com/settings/developers"
@@ -303,32 +298,23 @@ export function DeviceAuthPanel() {
         ) : (
           <div className="space-y-4">
             {/*
-              Folded by default: which OAuth App signs you in matters, but it is not what the page is for, and
-              four paragraphs of it standing between the user and the one button they came to press was the
-              whole problem. The sections inside open one at a time, so only the answer being looked for is read.
+              Folded by default, and three lines when it is opened: which key signs you in matters, but it is not
+              what the page is for, and paragraphs of it standing between the user and the one button they came to
+              press was the whole problem. What is left is the shared key, its limit, and the way out of the limit -
+              the field right underneath. Nothing here repeats the panel's own opening line about the token.
             */}
             <Collapsible
               title={usesSharedApp ? t('auth.app.sharedTitle') : t('auth.app.ownTitle')}
               className="rounded-md border border-line bg-white p-3"
             >
-              <div className="mt-2 divide-y divide-line">
-                {usesSharedApp ? (
-                  <>
-                    <Collapsible title={t('auth.app.ownerTitle')} className="py-2">
-                      <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.owner')}</p>
-                    </Collapsible>
-                    <Collapsible title={t('auth.app.rateLimitTitle')} className="py-2">
-                      <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.rateLimit')}</p>
-                    </Collapsible>
-                  </>
-                ) : null}
-                <Collapsible title={t('auth.app.tokenTitle')} className="py-2">
-                  <p className="mt-1.5 text-sm leading-6 text-ink/72">{t('auth.app.token')}</p>
-                </Collapsible>
-                <Collapsible title={t('auth.app.ownAppTitle')} className="py-2">
-                  {clientIdForm()}
-                </Collapsible>
-              </div>
+              {usesSharedApp ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink/72">
+                  <li>{t('auth.app.pointShared')}</li>
+                  <li>{t('auth.app.pointLimit')}</li>
+                  <li>{t('auth.app.pointOwn')}</li>
+                </ul>
+              ) : null}
+              {clientIdForm()}
             </Collapsible>
             <p className="text-sm leading-6 text-ink/70">
               {t('auth.permissions')}
