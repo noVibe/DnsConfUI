@@ -2,7 +2,7 @@
 
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
-import { DEFAULT_DNS_DONOR, DNS_DONORS, getDnsDonorLabel } from "@/domain/dns-donors";
+import { DEFAULT_DNS_DONOR, getDnsDonorLabel } from "@/domain/dns-donors";
 import {
   applyOverrides,
   overridableHostnames,
@@ -32,9 +32,6 @@ const MAX_IN_FLIGHT = 2;
 const MAX_DONORS = 4;
 const RETRY_BACKOFF_MS = 300;
 const MAX_RETRIES = 4;
-const RANK_POLL_MS = 25;
-/** A donor check that never comes back must not hold a run forever. */
-const RANK_TIMEOUT_MS = 12_000;
 
 type Phase = "idle" | "loading" | "ready" | "ranking" | "resolving" | "done";
 type BaseKind = "list" | "url" | "file";
@@ -46,21 +43,18 @@ type Resolved = { hostname: string; ip: string | null; ms: number | null; donor:
 
 const NO_PROGRESS: Progress = { total: 0, done: 0, resolved: 0, kept: 0 };
 
-/**
- * The resolve route's hostname rule, which is stricter than the parser's: it needs at least two labels.
- * A name it would reject is dropped here instead, because one bad name answers the whole batch with 400.
- */
-function isResolvableName(value: string): boolean {
-  return (
-    value.length <= 253 &&
-    /^[a-z\d_]([a-z\d_-]{0,61}[a-z\d_])?(\.[a-z\d_]([a-z\d_-]{0,61}[a-z\d_])?)+$/i.test(value)
-  );
-}
-
 function chunk<T>(items: readonly T[], size: number): T[][] {
   const batches: T[][] = [];
   for (let start = 0; start < items.length; start += size) batches.push(items.slice(start, start + size));
   return batches;
+}
+
+/** Never resolves: it rejects as soon as the run is cancelled, so an await can race a step against the cancel. */
+function cancellation(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason ?? new Error("aborted"));
+    signal.addEventListener("abort", () => reject(signal.reason ?? new Error("aborted")), { once: true });
+  });
 }
 
 function delay(ms: number, signal: AbortSignal): Promise<void> {
@@ -125,7 +119,7 @@ export function HostsBuilder() {
   const urlId = useId();
   const urlErrorId = useId();
   const fileId = useId();
-  const { runChecks, statusOf } = useDonorChecks();
+  const { runChecks } = useDonorChecks();
 
   const [baseKind, setBaseKind] = useState<BaseKind>("list");
   const [sourceKey, setSourceKey] = useState<HostsSourceKey>(DEFAULT_HOSTS_SOURCE);
@@ -142,14 +136,6 @@ export function HostsBuilder() {
   const [noDonors, setNoDonors] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-
-  // The ranking phase runs inside an async function, so the latest checks are read from a ref rather than a closure.
-  const donorStatuses = DNS_DONORS.map((entry) => {
-    const status = statusOf(entry.value);
-    return { value: entry.value, dns: status.dns, dnsMs: status.dnsMs };
-  });
-  const statusesRef = useRef(donorStatuses);
-  statusesRef.current = donorStatuses;
 
   const runRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -227,16 +213,14 @@ export function HostsBuilder() {
    * dead donor in front would cost its DNS timeout on each of a thousand domains.
    */
   async function rankDonors(signal: AbortSignal): Promise<string[]> {
-    runChecks();
-    const deadline = Date.now() + RANK_TIMEOUT_MS;
-    while (statusesRef.current.some((status) => status.dns === "checking") && Date.now() < deadline) {
-      await delay(RANK_POLL_MS, signal);
-    }
-    return statusesRef.current
-      .filter((status) => status.dns === "ok")
-      .sort((a, b) => (a.dnsMs ?? 0) - (b.dnsMs ?? 0))
+    // The checks report themselves when they are all in, so there is nothing to poll and no ceiling to truncate a
+    // slow network at; cancelling the run still answers at once, because the cancel is raced against them.
+    const checked = await Promise.race([runChecks(), cancellation(signal)]);
+    return checked
+      .filter(({ check }) => check.dnsMs !== null)
+      .sort((a, b) => (a.check.dnsMs ?? 0) - (b.check.dnsMs ?? 0))
       .slice(0, MAX_DONORS)
-      .map((status) => status.value);
+      .map(({ donor }) => donor);
   }
 
   async function resolveBatch(hostnames: string[], donors: string[], signal: AbortSignal): Promise<Resolved[]> {
@@ -271,11 +255,11 @@ export function HostsBuilder() {
     runRef.current = controller;
     resetRun();
 
+    // A legal name no resolver can be asked about (`localhost` and friends) keeps its original address, so it is
+    // counted as done and kept from the start rather than left out of the totals.
     const names = overridableHostnames(base.parsed);
-    const resolvable = names.filter(isResolvableName);
-    // A name the route would refuse is counted as kept straight away, so the totals stay honest.
-    const unusable = names.length - resolvable.length;
-    setProgress({ total: names.length, done: unusable, resolved: 0, kept: unusable });
+    const unresolvable = base.summary.unresolvableHostnames;
+    setProgress({ total: names.length + unresolvable, done: unresolvable, resolved: 0, kept: unresolvable });
 
     let donors = [donor];
     if (mode === "auto") {
@@ -295,7 +279,7 @@ export function HostsBuilder() {
     }
 
     setPhase("resolving");
-    const batches = chunk(resolvable, BATCH_SIZE);
+    const batches = chunk(names, BATCH_SIZE);
     const overrides = new Map<string, string>();
     const answered = new Map<string, number>();
     let next = 0;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyOverrides,
   isPlausibleHostname,
+  isResolvableHostname,
   overridableHostnames,
   parseHosts,
   summarizeHosts
@@ -151,6 +152,33 @@ describe("parseHosts", () => {
   });
 });
 
+describe("isResolvableHostname", () => {
+  it("accepts a name a public resolver can answer for", () => {
+    expect(isResolvableHostname("ok.example")).toBe(true);
+    expect(isResolvableHostname("a.b.c.example.com")).toBe(true);
+    expect(isResolvableHostname("xn--80ak6aa92e.com")).toBe(true);
+    expect(isResolvableHostname("_acme-challenge.example.com")).toBe(true);
+    expect(isResolvableHostname(`${"a".repeat(63)}.example`)).toBe(true);
+  });
+
+  it("refuses what no public resolver can be asked about", () => {
+    expect(isResolvableHostname("localhost")).toBe(false);
+    expect(isResolvableHostname("myserver")).toBe(false);
+    expect(isResolvableHostname("")).toBe(false);
+    expect(isResolvableHostname("a.example.")).toBe(false);
+    expect(isResolvableHostname("a..example")).toBe(false);
+    expect(isResolvableHostname("-leading.example")).toBe(false);
+    expect(isResolvableHostname("bad!.example")).toBe(false);
+    expect(isResolvableHostname(`${"a".repeat(64)}.example`)).toBe(false);
+    expect(isResolvableHostname(`${"a".repeat(125)}.${"b".repeat(125)}.example`)).toBe(false);
+  });
+
+  it("stays a separate question from isPlausibleHostname: a single label is a legal entry", () => {
+    expect(isPlausibleHostname("localhost")).toBe(true);
+    expect(isResolvableHostname("localhost")).toBe(false);
+  });
+});
+
 describe("overridableHostnames", () => {
   it("returns distinct hostnames in order of first appearance", () => {
     const parsed = parseHosts(proxyListFixture(["b.example", "a.example"]));
@@ -185,6 +213,18 @@ describe("overridableHostnames", () => {
     const parsed = parseHosts(lf("1.2.3.4 A.Example", "5.6.7.8 a.example"));
 
     expect(overridableHostnames(parsed)).toEqual(["A.Example"]);
+  });
+
+  it("leaves out a legal name no public resolver can be asked about", () => {
+    const lines = ["4.4.4.4 single", "1.2.3.4 a.example intranet", "5.6.7.8 b.example", "7.7.7.7 single"];
+    const parsed = parseHosts(lf(...lines));
+
+    // The lines themselves stay overridable, so the single-label names keep their original address.
+    expect(parsed.lines.every((line) => line.kind === "entry" && line.entryClass === "overridable")).toBe(true);
+    expect(overridableHostnames(parsed)).toEqual(["a.example", "b.example"]);
+    // `single` appears twice and is counted once, as the resolvable names are.
+    expect(summarizeHosts(parsed)).toMatchObject({ overridableHostnames: 2, unresolvableHostnames: 2 });
+    expect(applyOverrides(parsed, {})).toBe(lf(...lines));
   });
 });
 
@@ -407,6 +447,7 @@ describe("summarizeHosts", () => {
       entries: 9,
       overridableEntries: 3,
       overridableHostnames: 3,
+      unresolvableHostnames: 0,
       blockingEntries: 4,
       ipv6Entries: 1,
       invalidEntries: 1,

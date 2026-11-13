@@ -14,7 +14,7 @@ const CRLF = "\r\n";
 
 /**
  * Two domains worth resolving (one of them pinned twice, as published lists do), a blocking entry that must
- * survive untouched, and a single-label name the resolve route would refuse.
+ * survive untouched, and a single-label name that is a legal entry but cannot be asked of a public resolver.
  */
 const BASE =
   [
@@ -118,7 +118,8 @@ describe("HostsBuilder", () => {
     expect(callsTo("/api/hosts/source")).toEqual([{ source: "geohide" }]);
     expect(await screen.findByText("В файле https://geohide.ru/hosts")).toBeInTheDocument();
     expect(screen.getByText("Записей: 5 в 6 строках")).toBeInTheDocument();
-    expect(screen.getByText("Доменов для перепроверки: 3")).toBeInTheDocument();
+    // Two, not three: the single-label entry is legal and is kept, but no public resolver can be asked about it.
+    expect(screen.getByText("Доменов для перепроверки: 2")).toBeInTheDocument();
     expect(screen.getByText("Блокирующих записей без изменений: 1")).toBeInTheDocument();
   });
 
@@ -165,7 +166,7 @@ describe("HostsBuilder", () => {
     await uploadBase();
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.getByText("Доменов для перепроверки: 3")).toBeInTheDocument();
+    expect(screen.getByText("Доменов для перепроверки: 2")).toBeInTheDocument();
   });
 
   it("sends exactly the donor chosen in manual mode", async () => {
@@ -300,6 +301,21 @@ describe("HostsBuilder", () => {
     );
   });
 
+  it("cancels a run while the donor checks are still out", async () => {
+    // A check that never answers: the run waits for the whole set, so cancelling must not wait with it.
+    donorChecks.checkDonor.mockReturnValue(new Promise(() => {}));
+    renderBuilder();
+    await uploadBase();
+
+    start();
+
+    expect(await screen.findByText("Проверяем, какие DNS-прокси отвечают…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(await screen.findByText("Отменено. Файл не собран.")).toBeInTheDocument();
+    expect(callsTo("/api/hosts/resolve")).toEqual([]);
+  });
+
   it("aborts the requests in flight when the run is cancelled", async () => {
     const signals: AbortSignal[] = [];
     fetchMock.mockImplementation(
@@ -356,7 +372,11 @@ describe("HostsBuilder", () => {
     expect(produced).toContain("4.4.4.4 single");
     expect(produced).toContain("# base list");
     expect(produced).toContain(`${ipFor("a.example")} a.example`);
-    // The route would refuse a single-label name, so it is never sent.
+    // Nothing a public resolver cannot answer for is sent, and it still counts towards the totals as kept.
     expect(callsTo("/api/hosts/resolve")[0].hostnames).toEqual(["a.example", "b.example"]);
+    expect(screen.getByRole("progressbar", { name: "Перепроверка доменов" })).toHaveAttribute("aria-valuemax", "3");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Готово: 2 из 3 доменов получили рабочий адрес, 1 оставили прежний."
+    );
   });
 });

@@ -47,8 +47,10 @@ describe("POST /api/hosts/resolve", () => {
     { donors: [`https://dns.example/${"a".repeat(2048)}`], hostnames: ["claude.ai"] },
     { donors: Array.from({ length: 12 }, (_, i) => `https://dns${i}.example/dns-query`), hostnames: ["claude.ai"] },
     { donors: [GEOHIDE], hostnames: Array.from({ length: 51 }, (_, i) => `host${i}.example`) },
-    { donors: [GEOHIDE], hostnames: ["not a hostname"] },
-    { donors: [GEOHIDE], hostnames: [`${"a".repeat(64)}.example`] },
+    { donors: [GEOHIDE], hostnames: "claude.ai" },
+    { donors: [GEOHIDE], hostnames: [42] },
+    { donors: [GEOHIDE], hostnames: [null] },
+    { donors: [GEOHIDE], hostnames: [`${"a".repeat(254)}`] },
     "}{"
   ])("rejects %j", async (body) => {
     const response = await POST(resolveRequest(body));
@@ -56,6 +58,23 @@ describe("POST /api/hosts/resolve", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: expect.any(String) });
     expect(dohMocks.resolveA).not.toHaveBeenCalled();
+  });
+
+  it("answers a name no resolver can be asked about with no address, keeping the rest of the batch", async () => {
+    dohMocks.resolveA.mockResolvedValue(["203.0.113.9"]);
+    probeMocks.probeHost.mockResolvedValue(authorized(40));
+
+    const hostnames = ["a.example", "not a hostname", "localhost", `${"a".repeat(64)}.example`, "b.example"];
+
+    expect(await resolved({ donors: [GEOHIDE], hostnames })).toEqual([
+      { hostname: "a.example", ip: "203.0.113.9", ms: 40, donor: GEOHIDE },
+      { hostname: "not a hostname", ip: null, ms: null, donor: null },
+      { hostname: "localhost", ip: null, ms: null, donor: null },
+      { hostname: `${"a".repeat(64)}.example`, ip: null, ms: null, donor: null },
+      { hostname: "b.example", ip: "203.0.113.9", ms: 40, donor: GEOHIDE }
+    ]);
+    // Such a name is never put on the wire: it cannot be encoded in a DNS query in the first place.
+    expect(dohMocks.resolveA.mock.calls.map(([, name]) => name)).toEqual(["a.example", "b.example"]);
   });
 
   it("returns the first address whose certificate validates for the hostname", async () => {

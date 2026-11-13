@@ -32,7 +32,9 @@ export function DnsMonitor() {
   const checking = [...statuses.map(({ status }) => status), ...(customStatus ? [customStatus] : [])]
     .some((status) => status.chatgpt === "checking");
 
-  useEffect(() => runChecks(), [runChecks]);
+  useEffect(() => {
+    void runChecks();
+  }, [runChecks]);
 
   function submit(event: FormEvent) {
     event.preventDefault();

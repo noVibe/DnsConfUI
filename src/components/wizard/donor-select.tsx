@@ -31,7 +31,9 @@ export function DonorSelect({
   const [active, setActive] = useState(0);
   const { runChecks, statusOf } = useDonorChecks();
 
-  useEffect(() => runChecks(), [runChecks]);
+  useEffect(() => {
+    void runChecks();
+  }, [runChecks]);
 
   useEffect(() => {
     if (!open) return;

@@ -60,6 +60,13 @@ export type HostsSummary = {
   readonly entries: number;
   readonly overridableEntries: number;
   readonly overridableHostnames: number;
+  /**
+   * Distinct hostnames on overridable entries that no public resolver can be
+   * asked about (a single label, such as `localhost`). Their lines are legal and
+   * are passed through unchanged, so a run reports them as kept rather than
+   * leaving the UI to work the number out for itself.
+   */
+  readonly unresolvableHostnames: number;
   readonly blockingEntries: number;
   readonly ipv6Entries: number;
   readonly invalidEntries: number;
@@ -117,6 +124,22 @@ export function isPlausibleHostname(value: string): boolean {
   return name.split(".").every((label) => HOSTNAME_LABEL.test(label));
 }
 
+/**
+ * Whether a public DNS resolver can be asked about this name at all.
+ *
+ * Deliberately a separate question from `isPlausibleHostname`: `localhost` or
+ * `myserver` is a perfectly legal hosts entry and its line must survive a run
+ * untouched, but no public DoH server can answer for a single-label name. The
+ * rules here are the ones the DNS query itself imposes - at least two labels, at
+ * most 253 characters in total and 63 per label - so a name that passes this can
+ * be handed to the resolve route, and one that does not never leaves the client.
+ */
+export function isResolvableHostname(value: string): boolean {
+  if (value.length > 253) return false;
+  const labels = value.split(".");
+  return labels.length >= 2 && labels.every((label) => HOSTNAME_LABEL.test(label));
+}
+
 /** A sink or loopback pin: meaningful as written, so never re-resolved. */
 export function isBlockingIp(value: string): boolean {
   if (BLOCKING_IPS.has(value)) return true;
@@ -168,22 +191,36 @@ export function parseHosts(text: string): ParsedHostsFile {
 }
 
 /**
- * Distinct hostnames that a run should re-resolve, in order of first
- * appearance. Matching is case-insensitive; the first spelling is kept.
+ * Distinct hostnames on overridable entries, in order of first appearance, split
+ * by whether a public resolver can be asked about them. Matching is
+ * case-insensitive; the first spelling is kept.
  */
-export function overridableHostnames(parsed: ParsedHostsFile): string[] {
+function splitOverridableHostnames(parsed: ParsedHostsFile): { resolvable: string[]; unresolvable: string[] } {
   const seen = new Set<string>();
-  const names: string[] = [];
+  const resolvable: string[] = [];
+  const unresolvable: string[] = [];
   for (const line of parsed.lines) {
     if (line.kind !== "entry" || line.entryClass !== "overridable") continue;
     for (const hostname of line.hostnames) {
       const key = hostname.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      names.push(hostname);
+      (isResolvableHostname(hostname) ? resolvable : unresolvable).push(hostname);
     }
   }
-  return names;
+  return { resolvable, unresolvable };
+}
+
+/**
+ * Distinct hostnames that a run should re-resolve, in order of first
+ * appearance. Matching is case-insensitive; the first spelling is kept.
+ *
+ * A legal entry whose name no public resolver can answer for (`localhost` and
+ * other single-label names) is left out, so nothing here can be refused by the
+ * resolve route; `summarizeHosts` counts those names instead.
+ */
+export function overridableHostnames(parsed: ParsedHostsFile): string[] {
+  return splitOverridableHostnames(parsed).resolvable;
 }
 
 export function summarizeHosts(parsed: ParsedHostsFile): HostsSummary {
@@ -207,11 +244,13 @@ export function summarizeHosts(parsed: ParsedHostsFile): HostsSummary {
     }
   }
 
+  const names = splitOverridableHostnames(parsed);
   return {
     lines: parsed.lines.length,
     entries,
     overridableEntries,
-    overridableHostnames: overridableHostnames(parsed).length,
+    overridableHostnames: names.resolvable.length,
+    unresolvableHostnames: names.unresolvable.length,
     blockingEntries,
     ipv6Entries,
     invalidEntries,

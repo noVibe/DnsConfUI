@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { BLOCKED_COUNTRIES, isDnsDonorPreset } from "@/domain/dns-donors";
+import { BLOCKED_COUNTRIES, isCheckableDonor, isDnsDonorPreset } from "@/domain/dns-donors";
 import { isPublicAddress, resolveA, traceCountry } from "@/lib/dns/doh";
 
 const CHECK_HOST = "chatgpt.com";
 const TIMEOUT_MS = 5000;
 const MAX_IN_FLIGHT = 50;
-
-// Presets, or any HTTPS DoH URL a user wants to try; resolveA refuses servers on non-public addresses.
-function isCheckableDonor(value: string): boolean {
-  if (isDnsDonorPreset(value)) return true;
-  if (value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-}
 
 const requestSchema = z.object({ donor: z.string().refine(isCheckableDonor) });
 

@@ -15,13 +15,22 @@ function toStatus(ms: number | null | undefined): Status {
 
 const PRESETS = DNS_DONORS.map((donor) => donor.value);
 
-/** Runs availability checks: `check` for the given DoH URLs, `runChecks` for every preset (plus `extra`). */
+/** One finished check, as the promise from `check`/`runChecks` reports it. */
+export type CheckedDonor = { readonly donor: string; readonly check: DonorCheck };
+
+/**
+ * Runs availability checks: `check` for the given DoH URLs, `runChecks` for every preset (plus `extra`).
+ *
+ * Both return a promise that settles once every requested check has an answer, and resolve with those answers, so a
+ * caller that needs to act on the whole set (ranking the donors, say) can await it instead of watching the rendered
+ * statuses go by. `statusOf` stays the way the UI reads them.
+ */
 export function useDonorChecks() {
   const { t } = useLocale();
   const pending = useRef(new Map<string, Promise<DonorCheck>>());
   const [checks, setChecks] = useState<Record<string, DonorCheck>>({});
 
-  const check = useCallback((donors: string[]) => {
+  const check = useCallback((donors: string[]): Promise<CheckedDonor[]> => {
     // A donor that is still being checked is left alone: its result is on the way.
     const fresh = donors.filter((donor) => !pending.current.has(donor));
     setChecks((prev) => {
@@ -29,7 +38,9 @@ export function useDonorChecks() {
       fresh.forEach((donor) => delete next[donor]);
       return next;
     });
-    fresh.forEach((donor) => {
+    const requested = donors.map((donor) => {
+      const started = pending.current.get(donor);
+      if (started) return { donor, request: started };
       const request = checkDonor(donor);
       pending.current.set(donor, request);
       request.then((result) => {
@@ -38,7 +49,10 @@ export function useDonorChecks() {
         pending.current.delete(donor);
         setChecks((prev) => ({ ...prev, [donor]: result }));
       });
+      return { donor, request };
     });
+    // `checkDonor` answers a failure rather than rejecting, so this settles once for every donor either way.
+    return Promise.all(requested.map(async ({ donor, request }) => ({ donor, check: await request })));
   }, []);
 
   const runChecks = useCallback((extra: string[] = []) => check([...PRESETS, ...extra]), [check]);

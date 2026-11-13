@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isDnsDonorPreset } from "@/domain/dns-donors";
+import { isCheckableDonor } from "@/domain/dns-donors";
+import { isResolvableHostname } from "@/domain/hosts";
 import { isPublicAddress, resolveA } from "@/lib/dns/doh";
 import { probeHost } from "@/lib/dns/probe";
 
@@ -11,27 +12,17 @@ const MAX_HOSTNAMES = 50;
 const MAX_CANDIDATES = 8;
 const POOL_SIZE = 10;
 const MAX_IN_FLIGHT = 10;
+/** No DNS name is longer than this, so a longer string is not a name at all. */
+const MAX_NAME_LENGTH = 253;
 
-// Same rule as /api/donors/check: presets, or any HTTPS DoH URL a user wants to try.
-function isCheckableDonor(value: string): boolean {
-  if (isDnsDonorPreset(value)) return true;
-  if (value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-}
-
-// A label longer than 63 bytes cannot be encoded in the DNS query at all.
-function isResolvableName(value: string): boolean {
-  return value.length <= 253 && /^[a-z\d_]([a-z\d_-]{0,61}[a-z\d_])?(\.[a-z\d_]([a-z\d_-]{0,61}[a-z\d_])?)+$/i.test(value);
-}
-
+/**
+ * The shape of the request is strict, but a single hostname inside it is not: a batch carries up to 50 names, and
+ * one odd entry in an uploaded list must not cost the other 49 their answer. A name this route cannot ask a
+ * resolver about is reported as unresolved in `results` instead (see `resolveHostname`).
+ */
 const requestSchema = z.object({
   donors: z.array(z.string().refine(isCheckableDonor)).min(1).max(MAX_DONORS),
-  hostnames: z.array(z.string().refine(isResolvableName)).min(1).max(MAX_HOSTNAMES)
+  hostnames: z.array(z.string().max(MAX_NAME_LENGTH)).min(1).max(MAX_HOSTNAMES)
 });
 
 /** The address that answered for this hostname, its handshake time and the donor that supplied it. */
@@ -67,7 +58,13 @@ class AddressRecord {
   }
 }
 
+const unresolved = (hostname: string): Resolved => ({ hostname, ip: null, ms: null, donor: null });
+
 async function resolveHostname(hostname: string, donors: string[], record: AddressRecord): Promise<Resolved> {
+  // Nothing to ask a public resolver: a single label, an empty string or an over-long label. It keeps its place in
+  // the answer with no address, exactly like a name every donor failed on.
+  if (!isResolvableHostname(hostname)) return unresolved(hostname);
+
   for (const donor of donors) {
     let answers: string[];
     try {
@@ -96,7 +93,7 @@ async function resolveHostname(hostname: string, donors: string[], record: Addre
       return { hostname, ip, ms: probe.ms, donor };
     }
   }
-  return { hostname, ip: null, ms: null, donor: null };
+  return unresolved(hostname);
 }
 
 // A fixed number of workers share the queue: a batch of 50 names never opens 50 DoH sessions at once.
