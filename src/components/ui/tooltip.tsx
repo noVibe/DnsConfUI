@@ -14,7 +14,7 @@ export function Tooltip({ text, className, align = "start" }: { text: string; cl
         // is for the icons near that edge: it opens leftwards instead. Centring the box on the icon is what used to
         // run off the left edge, because half of it is wider than the gutter left of the icons in a panel.
         align === "end" ? "right-0" : "left-0"
-      )}>o
+      )}>
         {text}
       </div>
     </span>
