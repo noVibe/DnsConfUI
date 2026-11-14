@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
 import { LocaleProvider, useLocale } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "./donor-checks";
 import { QuickModeUI } from "./quick-mode-ui";
 
 function LocaleSwitch() {
@@ -48,8 +49,10 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
 
   const view = render(
     <LocaleProvider>
-      <LocaleSwitch />
-      <QuickModeUI {...props} />
+      <DonorChecksProvider>
+        <LocaleSwitch />
+        <QuickModeUI {...props} />
+      </DonorChecksProvider>
     </LocaleProvider>
   );
   return { ...callbacks, container: view.container };

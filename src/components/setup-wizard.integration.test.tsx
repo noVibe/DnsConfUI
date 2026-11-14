@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
 import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST } from "@/domain/toggles";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "@/components/wizard/donor-checks";
 import { SetupWizard } from "./setup-wizard";
 
 const mocks = vi.hoisted(() => ({
@@ -44,7 +45,9 @@ describe("SetupWizard retained navigation", () => {
   it("returns from full setup to the retained configuration", async () => {
     render(
       <LocaleProvider>
-        <SetupWizard />
+        <DonorChecksProvider>
+          <SetupWizard />
+        </DonorChecksProvider>
       </LocaleProvider>
     );
 
@@ -91,7 +94,9 @@ describe("SetupWizard retained navigation", () => {
 
     render(
       <LocaleProvider>
-        <SetupWizard />
+        <DonorChecksProvider>
+          <SetupWizard />
+        </DonorChecksProvider>
       </LocaleProvider>
     );
 
@@ -123,7 +128,9 @@ describe("SetupWizard retained navigation", () => {
   it("selects the hosts lists again when geo-blocking is enabled with none left", async () => {
     render(
       <LocaleProvider>
-        <SetupWizard />
+        <DonorChecksProvider>
+          <SetupWizard />
+        </DonorChecksProvider>
       </LocaleProvider>
     );
 
@@ -158,7 +165,9 @@ describe("SetupWizard retained navigation", () => {
 
     render(
       <LocaleProvider>
-        <SetupWizard />
+        <DonorChecksProvider>
+          <SetupWizard />
+        </DonorChecksProvider>
       </LocaleProvider>
     );
 

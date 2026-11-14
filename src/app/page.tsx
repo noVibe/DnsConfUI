@@ -5,6 +5,7 @@ import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { DnsMonitor } from "@/components/dns-monitor";
 import { HostsBuilder } from "@/components/hosts-builder";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
+import { DonorChecksProvider } from "@/components/wizard/donor-checks";
 import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
@@ -80,23 +81,27 @@ export default function Home() {
 
         {token ? (
           <div className="w-full rounded-lg border border-line bg-white p-4 shadow-soft md:p-6">
-            <SetupWizard />
+            <DonorChecksProvider>
+              <SetupWizard />
+            </DonorChecksProvider>
           </div>
         ) : (
           <>
-            {/* One list of added proxies for both, and one set of hidden ones: what the monitor shows or hides is
-                what the builder offers, at the same moment. */}
+            {/* One list of added proxies for both, one set of hidden ones, and one round of checks: what the
+                monitor shows, hides or measured is what the builder offers, at the same moment. */}
             <CustomDonorsProvider>
               <HiddenDonorsProvider>
-                {/*
-                  Side by side once there is room for both: the two panels are read together - which proxy answers,
-                  and what the file will be built through - and one above the other wastes a wide screen on margins.
-                  They keep their own heights rather than stretching to the taller of the two.
-                */}
-                <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-                  <DnsMonitor />
-                  <HostsBuilder />
-                </div>
+                <DonorChecksProvider>
+                  {/*
+                    Side by side once there is room for both: the two panels are read together - which proxy answers,
+                    and what the file will be built through - and one above the other wastes a wide screen on margins.
+                    They keep their own heights rather than stretching to the taller of the two.
+                  */}
+                  <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+                    <DnsMonitor />
+                    <HostsBuilder />
+                  </div>
+                </DonorChecksProvider>
               </HiddenDonorsProvider>
             </CustomDonorsProvider>
 

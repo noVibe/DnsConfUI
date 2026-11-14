@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "./donor-checks";
 import { DonorSelect } from "./donor-select";
 
 const checks = vi.hoisted(() => ({
@@ -19,7 +20,9 @@ function renderSelect(value: string = DNS_DONORS[0].value) {
   const onChange = vi.fn();
   render(
     <LocaleProvider>
-      <DonorSelect value={value} onChange={onChange} label="DNS-донор" />
+      <DonorChecksProvider>
+        <DonorSelect value={value} onChange={onChange} label="DNS-донор" />
+      </DonorChecksProvider>
     </LocaleProvider>
   );
   return { onChange, combobox: screen.getByRole("combobox", { name: "DNS-донор" }) };

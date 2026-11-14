@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { DEFAULT_DNS_DONOR } from "@/domain/dns-donors";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "./donor-checks";
 import { ProfilesSection } from "./profiles-section";
 
 const apiMocks = vi.hoisted(() => ({ validateCredentials: vi.fn() }));
@@ -10,6 +11,15 @@ const apiMocks = vi.hoisted(() => ({ validateCredentials: vi.fn() }));
 vi.mock("@/lib/nextdns/api", () => ({ validateCredentials: apiMocks.validateCredentials }));
 
 vi.mock("@/lib/dns/donor-check", () => ({ checkDonor: () => new Promise(() => {}), visitorCountry: () => new Promise(() => {}) }));
+
+/** What the section needs around it: the language, and the one round of donor checks the page shares. */
+function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <LocaleProvider>
+      <DonorChecksProvider>{children}</DonorChecksProvider>
+    </LocaleProvider>
+  );
+}
 
 const profile = {
   clientId: "",
@@ -28,9 +38,9 @@ function renderSection(overrides: Partial<React.ComponentProps<typeof ProfilesSe
   };
 
   render(
-    <LocaleProvider>
+    <Providers>
       <ProfilesSection {...props} />
-    </LocaleProvider>,
+    </Providers>,
   );
 
   return { setValue };
@@ -41,13 +51,13 @@ function ControlledValidationSection() {
   const setValue = (_name: "profiles", value: typeof profiles) => setProfiles(value);
 
   return (
-    <LocaleProvider>
+    <Providers>
       <ProfilesSection
         profiles={profiles}
         setValue={setValue as React.ComponentProps<typeof ProfilesSection>["setValue"]}
         simplified
       />
-    </LocaleProvider>
+    </Providers>
   );
 }
 
@@ -59,14 +69,14 @@ function ControlledProfilesSection({ initial, onValidChange }: {
   const setValue = (_name: "profiles", value: typeof profiles) => setProfiles(value);
 
   return (
-    <LocaleProvider>
+    <Providers>
       <ProfilesSection
         profiles={profiles}
         setValue={setValue as React.ComponentProps<typeof ProfilesSection>["setValue"]}
         simplified
         onValidChange={onValidChange}
       />
-    </LocaleProvider>
+    </Providers>
   );
 }
 
@@ -75,14 +85,14 @@ function ControlledDonorSection({ donorDns }: { donorDns: string }) {
   const setValue = (_name: "profiles", value: typeof profiles) => setProfiles(value);
 
   return (
-    <LocaleProvider>
+    <Providers>
       <ProfilesSection
         profiles={profiles}
         setValue={setValue as React.ComponentProps<typeof ProfilesSection>["setValue"]}
         simplified
         retainCredentials
       />
-    </LocaleProvider>
+    </Providers>
   );
 }
 

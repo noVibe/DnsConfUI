@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { BLOCKED_COUNTRIES, DNS_DONORS } from "@/domain/dns-donors";
 import { checkDonor, visitorCountry, type DonorCheck } from "@/lib/dns/donor-check";
 import { useLocale } from "@/lib/i18n/context";
@@ -25,7 +25,7 @@ export type CheckedDonor = { readonly donor: string; readonly check: DonorCheck 
  * caller that needs to act on the whole set (ranking the donors, say) can await it instead of watching the rendered
  * statuses go by. `statusOf` stays the way the UI reads them.
  */
-export function useDonorChecks() {
+function useDonorChecksState() {
   const { t } = useLocale();
   const pending = useRef(new Map<string, Promise<DonorCheck>>());
   const [checks, setChecks] = useState<Record<string, DonorCheck>>({});
@@ -119,7 +119,29 @@ export function useDonorChecks() {
   return { check, runChecks, statusOf, reachesChatgpt };
 }
 
-export type DonorStatus = ReturnType<ReturnType<typeof useDonorChecks>["statusOf"]>;
+type DonorChecksStore = ReturnType<typeof useDonorChecksState>;
+
+const DonorChecksContext = createContext<DonorChecksStore | null>(null);
+
+/**
+ * One round of checks for the whole page.
+ *
+ * Held here rather than per component because two panels asking separately get two answers: the monitor and the
+ * hosts panel sit side by side, and the same server would show as answering in one and silent in the other, a
+ * second apart, while a run quietly used whichever set its own round happened to see. The added and the hidden
+ * servers are shared for the same reason - two lists of the same servers disagreeing is the thing worth avoiding.
+ */
+export function DonorChecksProvider({ children }: { children: ReactNode }) {
+  return <DonorChecksContext.Provider value={useDonorChecksState()}>{children}</DonorChecksContext.Provider>;
+}
+
+export function useDonorChecks(): DonorChecksStore {
+  const store = useContext(DonorChecksContext);
+  if (!store) throw new Error("useDonorChecks must be used within DonorChecksProvider");
+  return store;
+}
+
+export type DonorStatus = ReturnType<DonorChecksStore["statusOf"]>;
 
 export function StatusIcon({ status, label }: { status: Status; label: string }) {
   const Icon = status === "checking" ? Loader2 : status === "ok" ? CheckCircle2 : XCircle;

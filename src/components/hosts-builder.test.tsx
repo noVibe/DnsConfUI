@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { applyOverrides, parseHosts } from "@/domain/hosts";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "@/components/wizard/donor-checks";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
 import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
 import { DnsMonitor } from "./dns-monitor";
@@ -164,7 +165,9 @@ function renderBuilder() {
     <LocaleProvider>
       <CustomDonorsProvider>
         <HiddenDonorsProvider>
-          <HostsBuilder />
+          <DonorChecksProvider>
+            <HostsBuilder />
+          </DonorChecksProvider>
         </HiddenDonorsProvider>
       </CustomDonorsProvider>
     </LocaleProvider>
@@ -316,8 +319,10 @@ describe("HostsBuilder", () => {
       <LocaleProvider>
         <CustomDonorsProvider>
           <HiddenDonorsProvider>
-            <DnsMonitor />
-            <HostsBuilder />
+            <DonorChecksProvider>
+              <DnsMonitor />
+              <HostsBuilder />
+            </DonorChecksProvider>
           </HiddenDonorsProvider>
         </CustomDonorsProvider>
       </LocaleProvider>

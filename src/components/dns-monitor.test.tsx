@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { DonorChecksProvider } from "@/components/wizard/donor-checks";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
 import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
 import { DnsMonitor } from "./dns-monitor";
@@ -16,7 +17,9 @@ function renderMonitor() {
     <LocaleProvider>
       <CustomDonorsProvider>
         <HiddenDonorsProvider>
-          <DnsMonitor />
+          <DonorChecksProvider>
+            <DnsMonitor />
+          </DonorChecksProvider>
         </HiddenDonorsProvider>
       </CustomDonorsProvider>
     </LocaleProvider>
