@@ -5,6 +5,7 @@ import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { DnsMonitor } from "@/components/dns-monitor";
 import { HostsBuilder } from "@/components/hosts-builder";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
+import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
 import { useLocale } from "@/lib/i18n/context";
@@ -83,10 +84,13 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {/* One list of added proxies for both: adding one in the monitor is what offers it to the builder. */}
+            {/* One list of added proxies for both, and one set of hidden ones: what the monitor shows or hides is
+                what the builder offers, at the same moment. */}
             <CustomDonorsProvider>
-              <DnsMonitor />
-              <HostsBuilder />
+              <HiddenDonorsProvider>
+                <DnsMonitor />
+                <HostsBuilder />
+              </HiddenDonorsProvider>
             </CustomDonorsProvider>
 
             <details className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">

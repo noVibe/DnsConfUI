@@ -1,12 +1,13 @@
 "use client";
 
-import { RefreshCw, X } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { DNS_DONORS, isDnsDonorPreset } from "@/domain/dns-donors";
 import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useCustomDonors } from "@/components/wizard/custom-donors";
+import { useHiddenDonors } from "@/components/wizard/hidden-donors";
 import { ChatgptCheck, DnsCheck, useDonorChecks } from "@/components/wizard/donor-checks";
 
 const BUTTON_CLASS = "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60";
@@ -27,6 +28,9 @@ export function DnsMonitor() {
   const nameId = useId();
   const { check, runChecks, statusOf } = useDonorChecks();
   const { donors: kept, add, remove } = useCustomDonors();
+  const { hidden, toggle } = useHiddenDonors();
+  /** Whether the hidden rows are on screen right now. Not remembered: hiding is the preference, looking is not. */
+  const [revealed, setRevealed] = useState(false);
   const [custom, setCustom] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -34,6 +38,14 @@ export function DnsMonitor() {
   const [addFailed, setAddFailed] = useState(false);
   const listed = [...DNS_DONORS, ...kept];
   const statuses = listed.map((donor) => ({ donor, status: statusOf(donor.value) }));
+  const hiddenCount = listed.filter((donor) => hidden.has(donor.value)).length;
+  // Hidden rows are still checked, so revealing one shows an answer rather than a row that has to start over.
+  const shown = revealed ? statuses : statuses.filter(({ donor }) => !hidden.has(donor.value));
+  const eyeLabel = hiddenCount === 0
+    ? t("monitor.hidden.none")
+    : revealed
+      ? t("monitor.hidden.collapse", { count: hiddenCount })
+      : t("monitor.hidden.show", { count: hiddenCount });
   const customStatus = custom ? statusOf(custom) : null;
   const checking = [...statuses.map(({ status }) => status), ...(customStatus ? [customStatus] : [])]
     .some((status) => status.chatgpt === "checking");
@@ -99,11 +111,31 @@ export function DnsMonitor() {
               <th scope="col" className="w-full pb-1.5 text-left font-normal"><span className="sr-only">{t("monitor.server")}</span></th>
               <th scope="col" className="whitespace-nowrap pb-1.5 pr-2 text-left font-normal sm:pr-4"><span className="inline-flex items-center gap-1">DNS<Tooltip text={t("profiles.donorCheckDnsHint")} className="size-3" /></span></th>
               <th scope="col" className="whitespace-nowrap border-l border-line pb-1.5 pl-2 pr-2 text-left font-normal sm:pl-4 sm:pr-3"><span className="inline-flex items-center gap-1">ChatGPT<Tooltip text={t("profiles.donorCheckChatgptHint")} className="size-3" /></span></th>
+              <th scope="col" className="w-0 pb-1.5 pl-1 text-right font-normal">
+                <span className="sr-only">{t("monitor.hidden.column")}</span>
+                <button
+                  type="button"
+                  onClick={() => setRevealed((on) => !on)}
+                  disabled={hiddenCount === 0}
+                  // The count and what the click does are the whole message, so they are the button's own name.
+                  aria-label={eyeLabel}
+                  title={eyeLabel}
+                  aria-expanded={hiddenCount === 0 ? undefined : revealed}
+                  className={cn(
+                    "inline-flex rounded p-0.5 transition-colors",
+                    hiddenCount === 0 ? "cursor-not-allowed text-ink/20" : "text-moss hover:text-steel"
+                  )}
+                >
+                  {hiddenCount === 0
+                    ? <Eye className="size-3.5" aria-hidden="true" />
+                    : <EyeOff className="size-3.5" aria-hidden="true" />}
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {statuses.map(({ donor, status }) => (
-              <tr key={donor.value} className="border-t border-line">
+            {shown.map(({ donor, status }) => (
+              <tr key={donor.value} className={cn("border-t border-line", hidden.has(donor.value) && "opacity-50")}>
                 <th scope="row" className="whitespace-nowrap py-1.5 pr-2 text-left font-normal sm:pr-4">
                   <span className="flex items-center gap-1.5">
                     {donor.site ? (
@@ -126,6 +158,19 @@ export function DnsMonitor() {
                 </th>
                 <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-4"><DnsCheck status={status} /></td>
                 <td className="whitespace-nowrap border-l border-line py-1.5 pl-2 pr-2 sm:pl-4 sm:pr-3"><ChatgptCheck status={status} /></td>
+                <td className="py-1.5 pl-1 text-right">
+                  <button
+                    type="button"
+                    onClick={() => toggle(donor.value)}
+                    aria-label={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}
+                    title={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}
+                    className="inline-flex rounded p-0.5 text-ink/30 transition-colors hover:text-ink/70"
+                  >
+                    {hidden.has(donor.value)
+                      ? <EyeOff className="size-3.5" aria-hidden="true" />
+                      : <Eye className="size-3.5" aria-hidden="true" />}
+                  </button>
+                </td>
               </tr>
             ))}
             {custom && customStatus ? (
@@ -146,6 +191,8 @@ export function DnsMonitor() {
                 </th>
                 <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-4"><DnsCheck status={customStatus} /></td>
                 <td className="whitespace-nowrap border-l border-line py-1.5 pl-2 pr-2 sm:pl-4 sm:pr-3"><ChatgptCheck status={customStatus} /></td>
+                {/* Nothing to hide here: this row goes away by itself as soon as it is kept or dropped. */}
+                <td className="pl-1" />
               </tr>
             ) : null}
           </tbody>

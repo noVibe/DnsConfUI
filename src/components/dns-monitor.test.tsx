@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
+import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
 import { DnsMonitor } from "./dns-monitor";
 
 const checkDonor = vi.hoisted(() => vi.fn());
@@ -14,7 +15,9 @@ function renderMonitor() {
   render(
     <LocaleProvider>
       <CustomDonorsProvider>
-        <DnsMonitor />
+        <HiddenDonorsProvider>
+          <DnsMonitor />
+        </HiddenDonorsProvider>
       </CustomDonorsProvider>
     </LocaleProvider>
   );
@@ -22,6 +25,8 @@ function renderMonitor() {
 
 describe("DnsMonitor", () => {
   beforeEach(() => {
+    // The hidden servers are remembered in this browser, and jsdom's is shared by every test in the file.
+    window.localStorage.clear();
     checkDonor.mockReset();
     checkDonor.mockResolvedValue({ dnsMs: 90, chatgptMs: 300, country: "NL", direct: false });
     visitorCountry.mockReset();
@@ -62,6 +67,30 @@ describe("DnsMonitor", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/donors/custom", expect.objectContaining({ method: "POST" }));
   });
 
+  it("hides a row on request and brings it back through the column's own eye", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ donors: [] }) } as Response)));
+    renderMonitor();
+    const rows = () => screen.getAllByRole("row").length;
+    const before = rows();
+
+    fireEvent.click(screen.getByRole("button", { name: "Скрыть Comss" }));
+
+    expect(rows()).toBe(before - 1);
+    expect(screen.queryByRole("link", { name: "Comss" })).not.toBeInTheDocument();
+    // The header eye says how many are gone and what pressing it does.
+    const eye = screen.getByRole("button", { name: "Скрыто сервисов: 1. Нажмите, чтобы показать их" });
+
+    fireEvent.click(eye);
+
+    expect(rows()).toBe(before);
+    expect(screen.getByRole("link", { name: "Comss" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Показать Comss" }));
+
+    // Back in the table for good: with nothing hidden, the eye has nothing left to say.
+    expect(screen.getByRole("button", { name: "Скрытых сервисов нет" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Comss" })).toBeInTheDocument();
+  });
+
   it("takes a kept DoH back out of the table", async () => {
     const kept: { label: string; value: string }[] = [];
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
@@ -89,8 +118,9 @@ describe("DnsMonitor", () => {
 
     await waitFor(() => expect(screen.queryByRole("row", { name: /Мой DoH/ })).not.toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith("/api/donors/custom", expect.objectContaining({ method: "DELETE" }));
-    // A preset has no such button: nothing on this page could put it back.
-    expect(screen.queryByRole("button", { name: /Comss/ })).not.toBeInTheDocument();
+    // A preset has no such button: nothing on this page could put it back. It can still be hidden.
+    expect(screen.queryByRole("button", { name: "Удалить Comss из таблицы" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Скрыть Comss" })).toBeInTheDocument();
   });
 
   it("does not offer to keep a DoH that fails", async () => {

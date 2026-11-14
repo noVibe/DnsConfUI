@@ -4,6 +4,8 @@ import { DNS_DONORS } from "@/domain/dns-donors";
 import { applyOverrides, parseHosts } from "@/domain/hosts";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
+import { HiddenDonorsProvider } from "@/components/wizard/hidden-donors";
+import { DnsMonitor } from "./dns-monitor";
 import { HostsBuilder } from "./hosts-builder";
 
 const donorChecks = vi.hoisted(() => ({ checkDonor: vi.fn(), visitorCountry: vi.fn() }));
@@ -161,7 +163,9 @@ function renderBuilder() {
   render(
     <LocaleProvider>
       <CustomDonorsProvider>
-        <HostsBuilder />
+        <HiddenDonorsProvider>
+          <HostsBuilder />
+        </HiddenDonorsProvider>
       </CustomDonorsProvider>
     </LocaleProvider>
   );
@@ -182,6 +186,8 @@ function start() {
 
 describe("HostsBuilder", () => {
   beforeEach(() => {
+    // The hidden servers are remembered in this browser, and jsdom's is shared by every test in the file.
+    window.localStorage.clear();
     blobs.length = 0;
     revoke.mockReset();
     Object.assign(URL, {
@@ -200,6 +206,8 @@ describe("HostsBuilder", () => {
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
       const body = init.body ? JSON.parse(String(init.body)) : {};
+      if (url === "/api/donors/custom") return jsonResponse({ donors: [] });
+      // Only the monitor asks for this one, and only when a test renders it alongside the panel.
       if (url === "/api/donors/custom") return jsonResponse({ donors: [] });
       if (url === "/api/hosts/source") return jsonResponse({ text: BASE, url: "https://geohide.ru/hosts" });
       if (url === "/api/hosts/resolve") return resolveResponse(body);
@@ -300,6 +308,32 @@ describe("HostsBuilder", () => {
 
     await screen.findByRole("link", { name: "Скачать файл hosts" });
     expect(callsTo("/api/hosts/resolve").map((body) => body.donors)).toEqual([["https://dns.comss.one/dns-query"]]);
+  });
+
+  it("drops a proxy hidden in the monitor from this list, and lists it again unticked on request", async () => {
+    // Both panels at once, under the one store they share: hiding a row there is what has to reach the list here.
+    render(
+      <LocaleProvider>
+        <CustomDonorsProvider>
+          <HiddenDonorsProvider>
+            <DnsMonitor />
+            <HostsBuilder />
+          </HiddenDonorsProvider>
+        </CustomDonorsProvider>
+      </LocaleProvider>
+    );
+    await uploadBase();
+    const box = () => screen.queryByRole("checkbox", { name: /^Comss/ });
+    await waitFor(() => expect(box()).toBeChecked());
+
+    fireEvent.click(screen.getByRole("button", { name: "Скрыть Comss" }));
+
+    expect(box()).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "показать скрытые (1)" }));
+
+    // Listed again so it can be chosen by hand, but not ticked: hiding it was not a vote for using it.
+    expect(box()).not.toBeChecked();
   });
 
   it("leaves a proxy unticked when the monitor could not reach ChatGPT through it", async () => {

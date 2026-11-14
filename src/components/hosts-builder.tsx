@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Loader2 } from "lucide-react";
+import { Download, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import {
@@ -24,6 +24,7 @@ import { useLocale } from "@/lib/i18n/context";
 import { Button, SecondaryButton, cn, inputClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useCustomDonors } from "@/components/wizard/custom-donors";
+import { useHiddenDonors } from "@/components/wizard/hidden-donors";
 import { useDonorChecks, type CheckedDonor } from "@/components/wizard/donor-checks";
 
 /** The resolve route's own ceiling, so a batch is as large as it is allowed to be. */
@@ -259,6 +260,9 @@ export function HostsBuilder() {
   const fileId = useId();
   const { check, runChecks, statusOf } = useDonorChecks();
   const { donors: kept } = useCustomDonors();
+  const { hidden } = useHiddenDonors();
+  /** Whether the servers hidden in the monitor are listed here too. They are never ticked by being listed. */
+  const [showHidden, setShowHidden] = useState(false);
 
   const [baseKind, setBaseKind] = useState<BaseKind>("list");
   const [sourceKey, setSourceKey] = useState<HostsSourceKey>(DEFAULT_HOSTS_SOURCE);
@@ -295,8 +299,12 @@ export function HostsBuilder() {
   const extra = kept.map((donor) => donor.value).join(" ");
   // Answering DNS is not the same as being usable here: a proxy whose address does not serve chatgpt.com will not
   // serve the domains in the file either, and asking it costs every domain a failed lookup. So the ones ticked by
-  // default are the ones the monitor got ChatGPT through; any of them can still be ticked or unticked by hand.
-  const chosen = (value: string) => picks[value] ?? statusOf(value).chatgpt === "ok";
+  // default are the ones the monitor got ChatGPT through, minus the ones hidden there - hiding a server is saying
+  // it should be out of the way, and a tick it never asked for would put it back in the run. Any of them can
+  // still be ticked by hand once shown.
+  const chosen = (value: string) => picks[value] ?? (!hidden.has(value) && statusOf(value).chatgpt === "ok");
+  const hiddenHere = listed.filter((donor) => hidden.has(donor.value)).length;
+  const offered = showHidden ? listed : listed.filter((donor) => !hidden.has(donor.value));
   const atCap = listed.filter((donor) => chosen(donor.value)).length >= MAX_DONORS;
 
   // Checked as the panel opens, not when a run starts: the list below shows who answers, and everyone who does is
@@ -847,12 +855,12 @@ export function HostsBuilder() {
           </span>
         </legend>
         <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-          {listed.map(({ label, value }) => {
+          {offered.map(({ label, value }) => {
             const status = statusOf(value);
             const on = chosen(value);
             return (
               <li key={value}>
-                <label className="inline-flex items-center gap-1.5 text-xs text-ink/70">
+                <label className={cn("inline-flex items-center gap-1.5 text-xs text-ink/70", hidden.has(value) && "opacity-60")}>
                   <input
                     type="checkbox"
                     checked={on}
@@ -876,6 +884,20 @@ export function HostsBuilder() {
             );
           })}
         </ul>
+        {/* Only worth offering once something is hidden: otherwise this list is the whole list. */}
+        {hiddenHere > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowHidden((on) => !on)}
+            aria-expanded={showHidden}
+            className="mt-2 inline-flex items-center gap-1.5 rounded text-[11px] text-ink/50 transition-colors hover:text-ink"
+          >
+            {showHidden
+              ? <EyeOff className="size-3" aria-hidden="true" />
+              : <Eye className="size-3" aria-hidden="true" />}
+            {showHidden ? t("hosts.donors.hideHidden") : t("hosts.donors.showHidden", { count: hiddenHere })}
+          </button>
+        ) : null}
       </fieldset>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
