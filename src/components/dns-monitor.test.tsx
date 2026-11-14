@@ -174,7 +174,7 @@ describe("DnsMonitor", () => {
     expect(checkDonor).toHaveBeenCalledTimes(DNS_DONORS.length * 2);
   });
 
-  it("explains an address that is not an HTTPS URL", () => {
+  it("explains an address the check would refuse", () => {
     renderMonitor();
     const input = screen.getByRole("textbox", { name: "Проверить свой DoH" });
 
@@ -183,6 +183,14 @@ describe("DnsMonitor", () => {
 
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("Введите адрес DoH вида https://example.com/dns-query");
+    expect(checkDonor).toHaveBeenCalledTimes(DNS_DONORS.length);
+
+    // The server refuses credentials in the address, so the form says so instead of letting it come back as a
+    // check that simply failed.
+    fireEvent.change(input, { target: { value: "https://user:pass@dns.example/dns-query" } });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить" }));
+
+    expect(input).toHaveAttribute("aria-invalid", "true");
     expect(checkDonor).toHaveBeenCalledTimes(DNS_DONORS.length);
   });
 

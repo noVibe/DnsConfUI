@@ -583,6 +583,24 @@ describe("HostsBuilder", () => {
     expect(screen.queryByRole("link", { name: "Скачать файл hosts" })).not.toBeInTheDocument();
   });
 
+  it("drops a run in flight when another file is loaded under it", async () => {
+    const pending = heldBatches();
+    renderBuilder();
+    await uploadBase(BASE, "first");
+
+    start();
+    await waitFor(() => expect(pending).toHaveLength(1));
+
+    // The file picker stays live during a run, and the run belongs to the file it was started on: once that file
+    // is gone, its answers must not be written into the one that replaced it.
+    await uploadBase(BASE_WITH_OTHER, "second");
+    pending[0].answer(DNS_DONORS[0].value);
+
+    expect(await screen.findByText("Отменено. Файл не собран.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Скачать файл hosts" })).not.toBeInTheDocument();
+    expect(blobs).toEqual([]);
+  });
+
   it("starts a new run from the latency order instead of inheriting the last run's tally", async () => {
     withLatencies();
     fetchMock.mockImplementation(async (url: string, init: RequestInit) =>
@@ -737,6 +755,32 @@ describe("HostsBuilder", () => {
     expect(signals[0].aborted).toBe(true);
     expect(await screen.findByText("Отменено. Файл не собран.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Скачать файл hosts" })).not.toBeInTheDocument();
+  });
+
+  // The last batch has no job behind it to carry the cancel, so an abort swallowed while its body was being read
+  // would let the run reach its own end and offer the file the user had just cancelled.
+  it("drops a run cancelled while the last batch's answer is being read", async () => {
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/donors/custom") return jsonResponse({ donors: [] });
+      // The answer itself arrives; only reading it is held open, which is the gap the cancel lands in.
+      // `json` only ever throws, so it is cast through `unknown`: its type overlaps nothing on `Response`.
+      return { ok: true, status: 200, json: async () => { await held; throw new Error("aborted"); } } as unknown as Response;
+    });
+    renderBuilder();
+    await uploadBase();
+
+    start();
+    await waitFor(() => expect(callsTo("/api/hosts/resolve")).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+    release();
+
+    expect(await screen.findByText("Отменено. Файл не собран.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Скачать файл hosts" })).not.toBeInTheDocument();
+    expect(blobs).toEqual([]);
   });
 
   it("offers the rewritten file for download and reports which donor answered", async () => {

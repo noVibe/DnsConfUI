@@ -265,7 +265,7 @@ describe("overridableHostnames", () => {
     expect(parsed.lines.every((line) => line.kind === "entry" && line.entryClass === "overridable")).toBe(true);
     expect(overridableHostnames(parsed)).toEqual(["a.example", "b.example"]);
     // `single` appears twice and is counted once, as the resolvable names are.
-    expect(summarizeHosts(parsed)).toMatchObject({ overridableHostnames: 2, unresolvableHostnames: 2 });
+    expect(summarizeHosts(parsed)).toMatchObject({ unresolvableHostnames: 2 });
     expect(applyOverrides(parsed, {})).toBe(lf(...lines));
   });
 });
@@ -531,13 +531,10 @@ describe("summarizeHosts", () => {
       lines: 15,
       entries: 9,
       overridableEntries: 3,
-      overridableHostnames: 3,
       unresolvableHostnames: 0,
       blockingEntries: 4,
       ipv6Entries: 1,
-      invalidEntries: 1,
-      commentLines: 3,
-      blankLines: 2
+      invalidEntries: 1
     });
   });
 });

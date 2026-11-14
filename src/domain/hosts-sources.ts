@@ -37,10 +37,6 @@ export function getHostsSource(key: string): HostsSource | undefined {
   return HOSTS_SOURCES.find((source) => source.key === key);
 }
 
-export function getHostsSourceLabel(key: string): string | undefined {
-  return getHostsSource(key)?.label;
-}
-
 /** Every URL to try for a source, primary first. */
 export function hostsSourceUrls(key: string): readonly string[] {
   const source = getHostsSource(key);

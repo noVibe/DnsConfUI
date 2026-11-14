@@ -74,7 +74,6 @@ export type HostsSummary = {
   readonly lines: number;
   readonly entries: number;
   readonly overridableEntries: number;
-  readonly overridableHostnames: number;
   /**
    * Distinct hostnames on overridable entries that no public resolver can be
    * asked about (a single label, such as `localhost`). Their lines are legal and
@@ -85,8 +84,6 @@ export type HostsSummary = {
   readonly blockingEntries: number;
   readonly ipv6Entries: number;
   readonly invalidEntries: number;
-  readonly commentLines: number;
-  readonly blankLines: number;
 };
 
 const BLOCKING_IPS: ReadonlySet<string> = new Set(["0.0.0.0", "255.255.255.255", "::", "::1"]);
@@ -271,13 +268,9 @@ export function summarizeHosts(parsed: ParsedHostsFile): HostsSummary {
   let blockingEntries = 0;
   let ipv6Entries = 0;
   let invalidEntries = 0;
-  let commentLines = 0;
-  let blankLines = 0;
 
   for (const line of parsed.lines) {
-    if (line.kind === "comment") commentLines += 1;
-    else if (line.kind === "blank") blankLines += 1;
-    else if (line.kind === "entry") {
+    if (line.kind === "entry") {
       entries += 1;
       if (line.entryClass === "overridable") overridableEntries += 1;
       else if (line.entryClass === "blocking") blockingEntries += 1;
@@ -291,13 +284,10 @@ export function summarizeHosts(parsed: ParsedHostsFile): HostsSummary {
     lines: parsed.lines.length,
     entries,
     overridableEntries,
-    overridableHostnames: names.resolvable.length,
     unresolvableHostnames: names.unresolvable.length,
     blockingEntries,
     ipv6Entries,
-    invalidEntries,
-    commentLines,
-    blankLines
+    invalidEntries
   };
 }
 

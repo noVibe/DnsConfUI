@@ -1,3 +1,5 @@
+import type { IncomingMessage } from "node:http";
+import https from "node:https";
 import { isIP } from "node:net";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -38,74 +40,70 @@ class OversizeError extends Error {}
  * Reads the body while counting bytes, so an endless or oversized response is dropped instead of being buffered:
  * the real lists are 137 KB and 12 KB.
  */
-async function readCapped(response: Response): Promise<string> {
-  if (!response.body) return "";
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  let size = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > MAX_BYTES) throw new OversizeError();
-      text += decoder.decode(value, { stream: true });
-    }
-    return text + decoder.decode();
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
-}
-
-// Redirects are followed by hand so every hop is checked: a public host must not be able to forward us inwards.
-async function assertPublicHost(hostname: string): Promise<void> {
-  const literal = hostname.replace(/^\[|\]$/g, "");
-  if (isIP(literal)) {
-    if (!isPublicAddress(literal)) throw new Error(`${literal} is not a public address.`);
-    return;
-  }
-  await new Promise<void>((resolve, reject) => {
-    publicLookup(literal, { all: true }, (error) => (error ? reject(error) : resolve()));
+function readCapped(response: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const decoder = new TextDecoder();
+    let text = "";
+    let size = 0;
+    response.on("data", (chunk: Buffer) => {
+      size += chunk.byteLength;
+      if (size > MAX_BYTES) {
+        response.destroy();
+        return reject(new OversizeError());
+      }
+      text += decoder.decode(chunk, { stream: true });
+    });
+    response.once("end", () => resolve(text + decoder.decode()));
+    response.once("error", reject);
   });
 }
 
-/** `guard` is on for user-supplied URLs; the registry entries are constants in this app. */
+/**
+ * `guard` is on for user-supplied URLs; the registry entries are constants in this app.
+ * The guard is the lookup the connection itself uses, so a hostname cannot pass a check and then resolve elsewhere.
+ */
+function connect(url: string, guard: boolean): Promise<IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    https.get(
+      url,
+      {
+        headers: { accept: "text/plain, */*" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        lookup: guard ? publicLookup : undefined
+      },
+      resolve
+    ).once("error", reject);
+  });
+}
+
 async function download(target: string, guard: boolean): Promise<SourceFile | Failure> {
   let current = target;
+  // Redirects are followed by hand so every hop is checked: a public host must not be able to forward us inwards.
   for (let hop = 0; ; hop++) {
     if (!isFetchableUrl(current)) return { status: 400, error: "Only HTTPS addresses without credentials can be downloaded." };
-    if (guard) {
-      try {
-        await assertPublicHost(new URL(current).hostname);
-      } catch {
-        return { status: 400, error: "That address points to a private network." };
-      }
-    }
+    // An IP literal is connected to without a lookup, so it is the one case the guard has to check up front.
+    const literal = new URL(current).hostname.replace(/^\[|\]$/g, "");
+    if (guard && isIP(literal) && !isPublicAddress(literal)) return { status: 400, error: "That address points to a private network." };
 
-    let response: Response;
+    let response: IncomingMessage;
     try {
-      response = await fetch(current, {
-        headers: { accept: "text/plain, */*" },
-        redirect: "manual",
-        cache: "no-store",
-        signal: AbortSignal.timeout(TIMEOUT_MS)
-      });
+      response = await connect(current, guard);
     } catch {
       return UNREACHABLE;
     }
+    const status = response.statusCode ?? 0;
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("location");
-      await response.body?.cancel().catch(() => {});
+    if (status >= 300 && status < 400) {
+      const location = response.headers.location;
+      response.destroy();
       if (!location || hop >= MAX_REDIRECTS) return UNREACHABLE;
       current = new URL(location, current).toString();
       continue;
     }
 
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => {});
-      return { status: 502, error: `The server answered ${response.status} for that file.` };
+    if (status < 200 || status > 299) {
+      response.destroy();
+      return { status: 502, error: `The server answered ${status} for that file.` };
     }
 
     try {

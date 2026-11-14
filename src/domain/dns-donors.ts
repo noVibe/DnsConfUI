@@ -27,6 +27,12 @@ export function isDnsDonorPreset(value: string): boolean {
 /** A URL longer than this is not a DoH endpoint anyone typed; it is a payload. */
 const MAX_DONOR_URL_LENGTH = 2048;
 
+/** What the user typed, as a URL: people paste a bare host, so a missing scheme means HTTPS. */
+export function withHttpsScheme(value: string): string {
+  const typed = value.trim();
+  return !typed || /^[a-z][a-z\d+.-]*:\/\//i.test(typed) ? typed : `https://${typed}`;
+}
+
 /**
  * Whether a donor may be contacted at all: a preset, or any HTTPS DoH URL a user
  * wants to try. Credentials in the URL are refused so a donor can never carry

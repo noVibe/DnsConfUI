@@ -4,7 +4,6 @@ import {
   HOSTS_SOURCES,
   type HostsSource,
   getHostsSource,
-  getHostsSourceLabel,
   hostsSourceUrls,
   isHostsSourceKey
 } from "./hosts-sources";
@@ -72,7 +71,5 @@ describe("hostsSourceUrls", () => {
   it("returns nothing for an unknown key", () => {
     expect(hostsSourceUrls("nope")).toEqual([]);
     expect(getHostsSource("nope")).toBeUndefined();
-    expect(getHostsSourceLabel("nope")).toBeUndefined();
-    expect(getHostsSourceLabel("malw")).toBe("Malw");
   });
 });

@@ -2,7 +2,7 @@
 
 import { Download, Eye, EyeClosed, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
-import { DNS_DONORS } from "@/domain/dns-donors";
+import { DNS_DONORS, withHttpsScheme } from "@/domain/dns-donors";
 import {
   applyOverrides,
   hostFamily,
@@ -16,7 +16,6 @@ import {
 import {
   DEFAULT_HOSTS_SOURCE,
   HOSTS_SOURCES,
-  getHostsSourceLabel,
   isHostsSourceKey,
   type HostsSourceKey
 } from "@/domain/hosts-sources";
@@ -183,10 +182,8 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 function httpsUrl(value: string): string | null {
-  // People paste a bare host, so a missing scheme means HTTPS. The server does the SSRF and size checks.
-  const typed = value.trim();
-  if (!typed) return null;
-  const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(typed) ? typed : `https://${typed}`;
+  // The server does the SSRF and size checks; this one only insists on HTTPS.
+  const candidate = withHttpsScheme(value);
   try {
     return new URL(candidate).protocol === "https:" ? candidate : null;
   } catch {
@@ -388,6 +385,9 @@ export function HostsBuilder() {
   }, [base, resolvedIps, includeBlocking, includeOther, offer]);
 
   function resetRun() {
+    // Whatever this clears, a run still out would write over: it is dropped here rather than left to finish into
+    // a panel that has moved on to another file.
+    runRef.current?.abort();
     setProgress(NO_PROGRESS);
     setDonorCounts([]);
     setRetried(false);
@@ -493,6 +493,9 @@ export function HostsBuilder() {
       }
       if (response.ok) {
         const body = await response.json().catch(() => null);
+        // The same rule as the fetch above: an abort landing while the body was read ends the run. Swallowed here
+        // it would leave this batch looking merely missed, and the last one has no later job to carry the cancel.
+        if (signal.aborted) throw signal.reason ?? new Error("aborted");
         return Array.isArray(body?.results) ? (body.results as Resolved[]) : missed();
       }
       // 429 means the route is busy, not that the batch is wrong, so it is worth waiting for rather than losing.
@@ -504,9 +507,10 @@ export function HostsBuilder() {
 
   async function start() {
     if (!base) return;
+    // Before this run's controller is in `runRef`, so that dropping the previous run does not abort this one.
+    resetRun();
     const controller = new AbortController();
     runRef.current = controller;
-    resetRun();
 
     // A legal name no resolver can be asked about (`localhost` and friends) keeps its original address, so it is
     // counted as done and kept from the start rather than left out of the totals.

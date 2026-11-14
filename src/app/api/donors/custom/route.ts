@@ -33,7 +33,23 @@ export function GET() {
   return NextResponse.json({ donors: added });
 }
 
+/**
+ * Keeps another tab's page from adding or removing servers behind the user's back: a cross-origin fetch with a
+ * plain content type needs no preflight, so only the caller's own origin tells the two apart.
+ *
+ * Browsers send this header on every fetch - `same-origin` for the app's own calls, `cross-site` or `same-site`
+ * for another page's. Callers that are not a browser, such as curl, send none, so an absent header is allowed.
+ */
+function isSameOrigin(request: Request) {
+  const site = request.headers.get("sec-fetch-site");
+  return site === null || site === "same-origin";
+}
+
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Only this app can change this list." }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = addSchema.safeParse(body);
 
@@ -56,6 +72,10 @@ export async function POST(request: Request) {
 const removeSchema = z.object({ url: z.string() });
 
 export async function DELETE(request: Request) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Only this app can change this list." }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = removeSchema.safeParse(body);
 

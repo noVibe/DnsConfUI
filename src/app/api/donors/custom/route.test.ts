@@ -5,18 +5,18 @@ import { DELETE, GET, POST } from "./route";
 const OWN = "https://dns.example.net/dns-query";
 const OTHER = "https://doh.example.org/dns-query";
 
-function addRequest(body: unknown) {
+function addRequest(body: unknown, site?: string) {
   return new Request("http://localhost/api/donors/custom", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(site ? { "Sec-Fetch-Site": site } : {}) },
     body: typeof body === "string" ? body : JSON.stringify(body)
   });
 }
 
-function removeRequest(body: unknown) {
+function removeRequest(body: unknown, site?: string) {
   return new Request("http://localhost/api/donors/custom", {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(site ? { "Sec-Fetch-Site": site } : {}) },
     body: typeof body === "string" ? body : JSON.stringify(body)
   });
 }
@@ -96,6 +96,17 @@ describe("/api/donors/custom", () => {
     const response = await DELETE(removeRequest({ url: OWN }));
 
     expect(response.status).toBe(200);
+    expect(await listed()).toEqual([{ label: "Other", value: OTHER }]);
+  });
+
+  // A page on another site can POST here without a preflight, so the list has to refuse anything but our own calls.
+  it("refuses a call from another site and leaves the list alone", async () => {
+    const added = await POST(addRequest({ url: OWN, label: "Mine" }, "cross-site"));
+    const removed = await DELETE(removeRequest({ url: OTHER }, "cross-site"));
+
+    expect(added.status).toBe(403);
+    expect(removed.status).toBe(403);
+    expect(await added.json()).toEqual({ error: expect.any(String) });
     expect(await listed()).toEqual([{ label: "Other", value: OTHER }]);
   });
 });

@@ -2,7 +2,7 @@
 
 import { Eye, EyeClosed, RefreshCw, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { DNS_DONORS, isDnsDonorPreset } from "@/domain/dns-donors";
+import { DNS_DONORS, isCheckableDonor, isDnsDonorPreset, withHttpsScheme } from "@/domain/dns-donors";
 import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,14 +11,6 @@ import { useHiddenDonors } from "@/components/wizard/hidden-donors";
 import { ChatgptCheck, DnsCheck, useDonorChecks } from "@/components/wizard/donor-checks";
 
 const BUTTON_CLASS = "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60";
-
-function isHttpsUrl(value: string): boolean {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 export function DnsMonitor() {
   const { t } = useLocale();
@@ -61,11 +53,11 @@ export function DnsMonitor() {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const typed = input.trim();
-    // People often paste a bare host, so a missing scheme means HTTPS.
-    const value = /^[a-z][a-z\d+.-]*:\/\//i.test(typed) || !typed ? typed : `https://${typed}`;
-    setInvalid(!isHttpsUrl(value));
-    if (!isHttpsUrl(value)) return;
+    // Judged by the same rule the check route applies, so an address the form takes is one the server will check.
+    const value = withHttpsScheme(input);
+    const checkable = isCheckableDonor(value);
+    setInvalid(!checkable);
+    if (!checkable) return;
     setAddFailed(false);
     // A preset, or one already added, is listed already: it is rechecked in place instead of being added twice.
     const known = isDnsDonorPreset(value) || kept.some((donor) => donor.value === value);
