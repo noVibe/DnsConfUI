@@ -42,12 +42,12 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       {/*
-        One column, and it opens on the DNS monitor. Most people who run this locally come to look at the ping
-        table and leave with a hosts file; configuring a DNS provider through GitHub is the other, longer errand,
-        so it waits behind its own button together with everything that explains the project. Only the language
-        and theme switch stays at the top, because it applies to whatever is below it.
+        It opens on the DNS monitor. Most people who run this locally come to look at the ping table and leave
+        with a hosts file; configuring a DNS provider through GitHub is the other, longer errand, so it waits
+        behind its own button together with everything that explains the project. Only the language and theme
+        switch stays at the top, because it applies to whatever is below it.
       */}
-      <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
         <div className="rounded-lg border border-moss/30 bg-mint/70 p-4 shadow-sm dark:bg-paper">
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -88,8 +88,15 @@ export default function Home() {
                 what the builder offers, at the same moment. */}
             <CustomDonorsProvider>
               <HiddenDonorsProvider>
-                <DnsMonitor />
-                <HostsBuilder />
+                {/*
+                  Side by side once there is room for both: the two panels are read together - which proxy answers,
+                  and what the file will be built through - and one above the other wastes a wide screen on margins.
+                  They keep their own heights rather than stretching to the taller of the two.
+                */}
+                <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+                  <DnsMonitor />
+                  <HostsBuilder />
+                </div>
               </HiddenDonorsProvider>
             </CustomDonorsProvider>
 
