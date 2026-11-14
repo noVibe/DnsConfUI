@@ -127,7 +127,7 @@ export function DonorSelect({
               <Tooltip text={t("profiles.donorCheckTooltip")} className="size-3" />
             </span>
             <span className="flex items-center gap-1">DNS<Tooltip text={t("profiles.donorCheckDnsHint")} className="size-3" /></span>
-            <span className={cn(DIVIDER, "flex items-center gap-1")}>ChatGPT<Tooltip text={t("profiles.donorCheckChatgptHint")} className="size-3" align="end" /></span>
+            <span className={cn(DIVIDER, "flex items-center gap-1")}>ChatGPT<Tooltip text={t("profiles.donorCheckChatgptHint")} className="size-3" /></span>
           </div>
           <ul ref={listRef} id={`${id}-listbox`} role="listbox" aria-label={label} className="max-h-72 overflow-y-auto rounded-b-md">
             {options.map((option, index) => {

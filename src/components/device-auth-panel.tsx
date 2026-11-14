@@ -215,6 +215,7 @@ export function DeviceAuthPanel() {
         <p id={fieldHintId} className="text-xs leading-5 text-ink/50">
           {t('auth.app.fieldHint')}
         </p>
+        {/* Nothing here about NEXT_PUBLIC_GITHUB_CLIENT_ID: the field is the answer, and .env is for DOCKER.md. */}
         {ownClientId ? (
           <p className="text-xs leading-5 text-ink/60">
             {t('auth.app.inUse', { clientId: ownClientId })}{" "}
@@ -223,7 +224,6 @@ export function DeviceAuthPanel() {
             </button>
           </p>
         ) : null}
-        <p className="text-xs leading-5 text-ink/50">{t('auth.app.envAlternative')}</p>
       </div>
     );
   }

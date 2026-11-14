@@ -201,12 +201,12 @@ describe("HostsBuilder", () => {
     expect(screen.getByText("Перенаправление: 4")).toBeInTheDocument();
     expect(screen.getByText("Блокировка: 1")).toBeInTheDocument();
     expect(screen.getByText("Прочее: 0")).toBeInTheDocument();
-    // Two domains, not three: the single-label entry is legal and is kept, but no resolver can be asked about it.
-    expect(screen.getByRole("note", { name: /Каждый из 2 доменов/ })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Включать записи блокировки в итоговый файл" })).toBeChecked();
+    // Each group says what it is, since a count alone does not tell the user what will happen to those entries.
+    expect(screen.getByRole("note", { name: "Домены, перенаправляемые на прокси" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Оставить заблокированные домены в итоговом файле" })).toBeChecked();
     // Nothing to include or leave out of an empty group, so it is offered no choice.
     expect(
-      screen.queryByRole("checkbox", { name: "Включать прочие записи в итоговый файл" })
+      screen.queryByRole("checkbox", { name: "Оставить прочие записи в итоговом файле" })
     ).not.toBeInTheDocument();
   });
 
@@ -682,7 +682,7 @@ describe("HostsBuilder", () => {
     await screen.findByRole("link", { name: "Скачать файл hosts" });
     expect((await blobs[0].text()).split(CRLF)).toContain("0.0.0.0 ads.example");
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Включать записи блокировки в итоговый файл" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Оставить заблокированные домены в итоговом файле" }));
 
     await waitFor(() => expect(blobs).toHaveLength(2));
     const produced = (await blobs[1].text()).split(CRLF);
@@ -704,7 +704,7 @@ describe("HostsBuilder", () => {
     await screen.findByRole("link", { name: "Скачать файл hosts" });
     expect(screen.getByText("Прочее: 2")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Включать прочие записи в итоговый файл" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Оставить прочие записи в итоговом файле" }));
 
     await waitFor(() => expect(blobs).toHaveLength(2));
     const produced = (await blobs[1].text()).split(CRLF);

@@ -681,18 +681,22 @@ export function HostsBuilder() {
             )}
             {")"}
           </h3>
-          <ul className="mt-1.5 grid gap-1 text-xs text-ink/60">
-            <li>{t("hosts.summary.entries", { entries: base.summary.entries, lines: base.summary.lines })}</li>
-            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center gap-1">
+          <p className="mt-1.5 text-xs text-ink/60">
+            {t("hosts.summary.entries", { entries: base.summary.entries, lines: base.summary.lines })}
+          </p>
+          {/*
+            Two columns, so every choice sits under the one above it rather than wherever its own label happens to
+            end. Each row is a `contents` list item: its two cells become cells of this grid, which is what lets the
+            groups share the columns. The row with no choice to offer spans both of them.
+          */}
+          <ul className="mt-1.5 grid grid-cols-[auto_auto] items-center justify-start gap-x-4 gap-y-1 text-xs text-ink/60">
+            <li className="contents">
+              <span className="col-span-2 inline-flex items-center gap-1">
                 {t("hosts.group.redirect", { count: base.summary.overridableEntries })}
-                <Tooltip
-                  text={t("hosts.group.redirectHint", { domains: base.summary.overridableHostnames })}
-                  className="size-3"
-                />
+                <Tooltip text={t("hosts.group.redirectHint")} className="size-3" />
               </span>
             </li>
-            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <li className="contents">
               <span className="inline-flex items-center gap-1">
                 {t("hosts.group.blocking", { count: base.summary.blockingEntries })}
                 <Tooltip text={t("hosts.group.blockingHint")} className="size-3" />
@@ -704,9 +708,11 @@ export function HostsBuilder() {
                   checked={includeBlocking}
                   onChange={setIncludeBlocking}
                 />
-              ) : null}
+              ) : (
+                <span />
+              )}
             </li>
-            <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <li className="contents">
               <span className="inline-flex items-center gap-1">
                 {t("hosts.group.other", { count: otherEntries })}
                 <Tooltip text={t("hosts.group.otherHint")} className="size-3" />
@@ -718,7 +724,9 @@ export function HostsBuilder() {
                   checked={includeOther}
                   onChange={setIncludeOther}
                 />
-              ) : null}
+              ) : (
+                <span />
+              )}
             </li>
           </ul>
         </div>
