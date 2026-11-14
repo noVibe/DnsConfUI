@@ -42,7 +42,6 @@ export const locale = {
   "monitor.hidden.column": "Visibility",
   "monitor.hide": "Hide {label}",
   "monitor.unhide": "Show {label}",
-  "monitor.hidden.none": "Nothing is hidden",
   "monitor.hidden.show": "Hidden servers: {count}. Click to show them",
   "monitor.hidden.collapse": "Hidden servers: {count}. Click to take them out of the table again",
   "monitor.custom.tag": "custom",

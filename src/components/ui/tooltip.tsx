@@ -1,7 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui";
 
 /** Breathing room between the icon and its box, and between the box and the edge of the window. */
@@ -22,8 +22,12 @@ type At = { readonly left: number; readonly top: number };
  * when the room above has run out.
  *
  * The icon keeps the whole text in `aria-label`, so a screen reader gets it whether or not the box is on screen.
+ *
+ * `children` put the same box on something else - a button, say - instead of on an information icon. The wrapper
+ * then carries neither the role nor the label, because the thing inside it is the one a reader should be told
+ * about, and a focusable note around a focusable control would be read twice and tabbed through twice.
  */
-export function Tooltip({ text, className }: { text: string; className?: string }) {
+export function Tooltip({ text, className, children }: { text: string; className?: string; children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<At | null>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -73,15 +77,14 @@ export function Tooltip({ text, className }: { text: string; className?: string 
     <span
       ref={anchorRef}
       className="relative inline-flex"
-      role="note"
-      aria-label={text}
-      tabIndex={0}
+      {...(children ? {} : { role: "note", "aria-label": text, tabIndex: 0 })}
       onMouseEnter={show}
       onMouseLeave={hide}
+      // Focus bubbles, so reaching the control inside by keyboard opens the box just as hovering it does.
       onFocus={show}
       onBlur={hide}
     >
-      <Info className={cn("size-3.5 text-ink/40", className)} />
+      {children ?? <Info className={cn("size-3.5 text-ink/40", className)} />}
       {open ? (
         <div
           ref={boxRef}

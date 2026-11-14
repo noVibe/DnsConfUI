@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Download, Eye, EyeClosed, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import {
@@ -893,8 +893,8 @@ export function HostsBuilder() {
             className="mt-2 inline-flex items-center gap-1.5 rounded text-[11px] text-ink/50 transition-colors hover:text-ink"
           >
             {showHidden
-              ? <EyeOff className="size-3" aria-hidden="true" />
-              : <Eye className="size-3" aria-hidden="true" />}
+              ? <Eye className="size-3" aria-hidden="true" />
+              : <EyeClosed className="size-3" aria-hidden="true" />}
             {showHidden ? t("hosts.donors.hideHidden") : t("hosts.donors.showHidden", { count: hiddenHere })}
           </button>
         ) : null}

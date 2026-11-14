@@ -44,7 +44,6 @@ export const locale: Record<LocaleKey, string> = {
   "monitor.hidden.column": "Видимость",
   "monitor.hide": "Скрыть {label}",
   "monitor.unhide": "Показать {label}",
-  "monitor.hidden.none": "Скрытых сервисов нет",
   "monitor.hidden.show": "Скрыто сервисов: {count}. Нажмите, чтобы показать их",
   "monitor.hidden.collapse": "Скрыто сервисов: {count}. Нажмите, чтобы снова убрать их из таблицы",
   "monitor.custom.tag": "свой",

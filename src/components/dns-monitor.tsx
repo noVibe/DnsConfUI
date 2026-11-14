@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, RefreshCw, X } from "lucide-react";
+import { Eye, EyeClosed, RefreshCw, X } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { DNS_DONORS, isDnsDonorPreset } from "@/domain/dns-donors";
 import { useLocale } from "@/lib/i18n/context";
@@ -41,11 +41,9 @@ export function DnsMonitor() {
   const hiddenCount = listed.filter((donor) => hidden.has(donor.value)).length;
   // Hidden rows are still checked, so revealing one shows an answer rather than a row that has to start over.
   const shown = revealed ? statuses : statuses.filter(({ donor }) => !hidden.has(donor.value));
-  const eyeLabel = hiddenCount === 0
-    ? t("monitor.hidden.none")
-    : revealed
-      ? t("monitor.hidden.collapse", { count: hiddenCount })
-      : t("monitor.hidden.show", { count: hiddenCount });
+  const eyeLabel = revealed
+    ? t("monitor.hidden.collapse", { count: hiddenCount })
+    : t("monitor.hidden.show", { count: hiddenCount });
   const customStatus = custom ? statusOf(custom) : null;
   const checking = [...statuses.map(({ status }) => status), ...(customStatus ? [customStatus] : [])]
     .some((status) => status.chatgpt === "checking");
@@ -113,23 +111,24 @@ export function DnsMonitor() {
               <th scope="col" className="whitespace-nowrap border-l border-line pb-1.5 pl-2 pr-2 text-left font-normal sm:pl-4 sm:pr-3"><span className="inline-flex items-center gap-1">ChatGPT<Tooltip text={t("profiles.donorCheckChatgptHint")} className="size-3" /></span></th>
               <th scope="col" className="w-0 pb-1.5 pl-1 text-right font-normal">
                 <span className="sr-only">{t("monitor.hidden.column")}</span>
-                <button
-                  type="button"
-                  onClick={() => setRevealed((on) => !on)}
-                  disabled={hiddenCount === 0}
-                  // The count and what the click does are the whole message, so they are the button's own name.
-                  aria-label={eyeLabel}
-                  title={eyeLabel}
-                  aria-expanded={hiddenCount === 0 ? undefined : revealed}
-                  className={cn(
-                    "inline-flex rounded p-0.5 transition-colors",
-                    hiddenCount === 0 ? "cursor-not-allowed text-ink/20" : "text-moss hover:text-steel"
-                  )}
-                >
-                  {hiddenCount === 0
-                    ? <Eye className="size-3.5" aria-hidden="true" />
-                    : <EyeOff className="size-3.5" aria-hidden="true" />}
-                </button>
+                {/* Nothing hidden, nothing to unfold: the eye appears when it has something to say. */}
+                {hiddenCount > 0 ? (
+                  <Tooltip text={eyeLabel}>
+                    <button
+                      type="button"
+                      onClick={() => setRevealed((on) => !on)}
+                      // The count and what the click does are the whole message, so they are the button's own name.
+                      aria-label={eyeLabel}
+                      aria-expanded={revealed}
+                      className="inline-flex rounded p-0.5 text-moss transition-colors hover:text-steel"
+                    >
+                      {/* Open while they are on screen, closed while they are not: the lid is the state. */}
+                      {revealed
+                        ? <Eye className="size-3.5" aria-hidden="true" />
+                        : <EyeClosed className="size-3.5" aria-hidden="true" />}
+                    </button>
+                  </Tooltip>
+                ) : null}
               </th>
             </tr>
           </thead>
@@ -159,17 +158,18 @@ export function DnsMonitor() {
                 <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-4"><DnsCheck status={status} /></td>
                 <td className="whitespace-nowrap border-l border-line py-1.5 pl-2 pr-2 sm:pl-4 sm:pr-3"><ChatgptCheck status={status} /></td>
                 <td className="py-1.5 pl-1 text-right">
-                  <button
-                    type="button"
-                    onClick={() => toggle(donor.value)}
-                    aria-label={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}
-                    title={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}
-                    className="inline-flex rounded p-0.5 text-ink/30 transition-colors hover:text-ink/70"
-                  >
-                    {hidden.has(donor.value)
-                      ? <EyeOff className="size-3.5" aria-hidden="true" />
-                      : <Eye className="size-3.5" aria-hidden="true" />}
-                  </button>
+                  <Tooltip text={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(donor.value)}
+                      aria-label={t(hidden.has(donor.value) ? "monitor.unhide" : "monitor.hide", { label: donor.label })}
+                      className="inline-flex rounded p-0.5 text-ink/30 transition-colors hover:text-ink/70"
+                    >
+                      {hidden.has(donor.value)
+                        ? <EyeClosed className="size-3.5" aria-hidden="true" />
+                        : <Eye className="size-3.5" aria-hidden="true" />}
+                    </button>
+                  </Tooltip>
                 </td>
               </tr>
             ))}

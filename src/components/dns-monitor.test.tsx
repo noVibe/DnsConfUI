@@ -86,8 +86,8 @@ describe("DnsMonitor", () => {
     expect(screen.getByRole("link", { name: "Comss" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Показать Comss" }));
 
-    // Back in the table for good: with nothing hidden, the eye has nothing left to say.
-    expect(screen.getByRole("button", { name: "Скрытых сервисов нет" })).toBeDisabled();
+    // Back in the table for good: with nothing hidden, the column's eye has nothing to say and is not there.
+    expect(screen.queryByRole("button", { name: /Скрыто сервисов/ })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Comss" })).toBeInTheDocument();
   });
 
