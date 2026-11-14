@@ -4,8 +4,9 @@ name: Publish image
 #
 #   docker run -d -p 3000:3000 --name dnsconf-ui ghcr.io/novibe/dnsconfui
 #
-# `workflow_dispatch` is here so the image can be published from a branch by hand,
-# from the Actions tab, without waiting for a merge.
+# Pushing a `v*` tag is what publishes a release, and is the one trigger that works
+# from a branch that has not been merged: GitHub only offers `workflow_dispatch` for
+# workflow files that are on the default branch.
 on:
   push:
     branches: [master]
@@ -47,8 +48,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          # `latest` is what the address in the README resolves to, since it carries no
+          # tag of its own, so both a default-branch push and a `v*` release set it.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha
