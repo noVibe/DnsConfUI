@@ -58,7 +58,7 @@ Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then:
 - **Windows:** double-click `docker-start.cmd`
 - **macOS / Linux:** run `./docker-start.sh`
 
-The script creates `.env`, builds the image and starts the app at
+The script builds the image and starts the app at
 http://localhost:3000. There is nothing to fill in.
 
 Prefer doing it by hand?

@@ -4,8 +4,7 @@
 #
 #   ./docker-start.sh
 #
-# Creates .env on first run, then builds and starts the app with Docker.
-# There is nothing to fill in.
+# Builds and starts the app with Docker. There is nothing to fill in.
 # ---------------------------------------------------------------------------
 set -e
 
@@ -36,14 +35,11 @@ else
   exit 1
 fi
 
-# --- 2. make sure .env exists ----------------------------------------------
-if [ ! -f .env ]; then
-  cp .env.example .env
-  say "Created .env from .env.example"
-fi
-
-# --- 3. build and run -------------------------------------------------------
-HOST_PORT=$(grep -E '^HOST_PORT=' .env | head -n 1 | cut -d= -f2- | tr -d '[:space:]' | tr -d '\r')
+# --- 2. build and run -------------------------------------------------------
+# .env is optional and carries nothing but HOST_PORT, so there is no file to create here: without one the app
+# serves on 3000, which is what the default below says. The pipeline ends in `tr`, so a missing file is not an
+# error to `set -e` either.
+HOST_PORT=$({ [ -f .env ] && grep -E '^HOST_PORT=' .env; } | head -n 1 | cut -d= -f2- | tr -d '[:space:]' | tr -d '\r')
 [ -z "$HOST_PORT" ] && HOST_PORT=3000
 
 say ""

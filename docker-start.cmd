@@ -4,8 +4,7 @@ rem  DnsConf UI - one-click start for Windows.
 rem
 rem  Just double-click this file.
 rem
-rem  It creates .env on first run, then builds and starts the app with
-rem  Docker. There is nothing to fill in.
+rem  It builds and starts the app with Docker. There is nothing to fill in.
 rem ---------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -40,17 +39,15 @@ set "COMPOSE=docker compose"
 docker compose version >nul 2>nul
 if errorlevel 1 set "COMPOSE=docker-compose"
 
-rem --- 2. make sure .env exists ----------------------------------------------
-if not exist ".env" (
-  copy ".env.example" ".env" >nul
-  echo Created .env from .env.example
-)
-
-rem --- 3. build and run -------------------------------------------------------
+rem --- 2. build and run -------------------------------------------------------
+rem .env is optional and carries nothing but HOST_PORT, so there is no file to create here: without one the app
+rem serves on 3000, which is what the default below says.
 set "HOST_PORT="
-for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"HOST_PORT=" ".env"`) do set "HOST_PORT=%%B"
-set "HOST_PORT=!HOST_PORT: =!"
-if "!HOST_PORT!"=="" set "HOST_PORT=3000"
+for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"HOST_PORT=" ".env" 2^>nul`) do set "HOST_PORT=%%B"
+rem Stripped only when there is something to strip: `!VAR: =!` on an unset variable expands to a literal " =",
+rem which the line below would then take for a port and print in the address.
+if defined HOST_PORT set "HOST_PORT=!HOST_PORT: =!"
+if not defined HOST_PORT set "HOST_PORT=3000"
 
 echo.
 echo Building and starting DnsConf UI...

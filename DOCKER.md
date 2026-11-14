@@ -23,8 +23,8 @@ while you use the app.
 | **Windows** | double-click **`docker-start.cmd`** |
 | **macOS / Linux** | run **`./docker-start.sh`** in a terminal |
 
-The script checks that Docker is running, creates the `.env` file for you, then
-builds and starts everything. It asks nothing.
+The script checks that Docker is running, then builds and starts everything.
+It asks nothing and creates nothing.
 
 ### The manual way
 
@@ -212,8 +212,8 @@ docker compose up --build
 - **Windows:** двойной клик по файлу **`docker-start.cmd`**
 - **macOS / Linux:** в терминале **`./docker-start.sh`**
 
-Скрипт сам проверит Docker, создаст файл `.env` и всё соберёт. Ничего спрашивать
-он не будет.
+Скрипт сам проверит Docker и всё соберёт. Ничего спрашивать он не будет и
+никаких файлов не создаст.
 
 Или вручную — файл `.env` не обязателен:
 
