@@ -569,9 +569,6 @@ export function HostsBuilder() {
         </h2>
         <Tooltip text={t("hosts.tooltip")} />
       </div>
-      <p className="mt-2 text-sm leading-6 text-ink/72">{t("hosts.intro")}</p>
-      <p className="mt-2 text-xs leading-5 text-ink/50">{t("hosts.note")}</p>
-
       <fieldset className="mt-4 border-t border-line pt-3">
         <legend className="text-xs font-medium text-ink/70">{t("hosts.base.legend")}</legend>
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">

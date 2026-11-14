@@ -42,8 +42,6 @@ export const locale = {
 
   "hosts.title": "Refresh a hosts file",
   "hosts.tooltip": "A published hosts file pins every domain to a proxy address that worked when the list was built. Here the same file is rebuilt with addresses that work now.",
-  "hosts.intro": "Pick a published list, your own address or your own file. Every domain in it is resolved again through the DNS proxies, and only addresses that answer right now go into the result.",
-  "hosts.note": "A hosts file like this routes the listed domains through a third party's servers, which therefore see those connections. Install one only if you trust whoever runs them.",
   "hosts.base.legend": "Base file",
   "hosts.base.list": "Published list",
   "hosts.base.listLabel": "Which published list",
