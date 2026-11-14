@@ -304,7 +304,37 @@ export function HostsBuilder() {
   // still be ticked by hand once shown.
   const chosen = (value: string) => picks[value] ?? (!hidden.has(value) && statusOf(value).chatgpt === "ok");
   const hiddenHere = listed.filter((donor) => hidden.has(donor.value)).length;
-  const offered = showHidden ? listed : listed.filter((donor) => !hidden.has(donor.value));
+  const offered = listed.filter((donor) => !hidden.has(donor.value));
+
+  /** One proxy to tick or untick, with what the monitor got out of it in place of a time when it got nothing. */
+  function donorBox({ label, value }: { label: string; value: string }) {
+    const status = statusOf(value);
+    const on = chosen(value);
+    return (
+      <li key={value}>
+        <label className={cn("inline-flex items-center gap-1.5 text-xs text-ink/70", hidden.has(value) && "opacity-60")}>
+          <input
+            type="checkbox"
+            checked={on}
+            // Past the route's ceiling the only thing left to offer is a swap, so the rest stop taking ticks.
+            disabled={!on && atCap}
+            onChange={(event) => setPicks((current) => ({ ...current, [value]: event.target.checked }))}
+            className="size-3.5 accent-moss"
+          />
+          {label}
+          <span className="text-[11px] tabular-nums text-ink/40">
+            {status.chatgpt === "checking"
+              ? t("hosts.donors.checking")
+              : status.chatgptMs !== null
+                ? t("profiles.donorCheckMs", { ms: status.chatgptMs })
+                : status.dnsMs === null
+                  ? t("hosts.donors.silent")
+                  : t("hosts.donors.noChatgpt")}
+          </span>
+        </label>
+      </li>
+    );
+  }
   const atCap = listed.filter((donor) => chosen(donor.value)).length >= MAX_DONORS;
 
   // Checked as the panel opens, not when a run starts: the list below shows who answers, and everyone who does is
@@ -854,36 +884,7 @@ export function HostsBuilder() {
             <Tooltip text={t("hosts.mode.hint")} className="size-3" />
           </span>
         </legend>
-        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-          {offered.map(({ label, value }) => {
-            const status = statusOf(value);
-            const on = chosen(value);
-            return (
-              <li key={value}>
-                <label className={cn("inline-flex items-center gap-1.5 text-xs text-ink/70", hidden.has(value) && "opacity-60")}>
-                  <input
-                    type="checkbox"
-                    checked={on}
-                    // Past the route's ceiling the only thing left to offer is a swap, so the rest stop taking ticks.
-                    disabled={!on && atCap}
-                    onChange={(event) => setPicks((current) => ({ ...current, [value]: event.target.checked }))}
-                    className="size-3.5 accent-moss"
-                  />
-                  {label}
-                  <span className="text-[11px] tabular-nums text-ink/40">
-                    {status.chatgpt === "checking"
-                      ? t("hosts.donors.checking")
-                      : status.chatgptMs !== null
-                        ? t("profiles.donorCheckMs", { ms: status.chatgptMs })
-                        : status.dnsMs === null
-                          ? t("hosts.donors.silent")
-                          : t("hosts.donors.noChatgpt")}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+        <ul className="mt-2 grid gap-1 sm:grid-cols-2">{offered.map(donorBox)}</ul>
         {/* Only worth offering once something is hidden: otherwise this list is the whole list. */}
         {hiddenHere > 0 ? (
           <button
@@ -897,6 +898,12 @@ export function HostsBuilder() {
               : <EyeClosed className="size-3" aria-hidden="true" />}
             {showHidden ? t("hosts.donors.hideHidden") : t("hosts.donors.showHidden", { count: hiddenHere })}
           </button>
+        ) : null}
+        {/* Their own list under the button, not mixed back into the one above: they were put aside on purpose. */}
+        {showHidden && hiddenHere > 0 ? (
+          <ul className="mt-2 grid gap-1 border-t border-line pt-2 sm:grid-cols-2">
+            {listed.filter((donor) => hidden.has(donor.value)).map(donorBox)}
+          </ul>
         ) : null}
       </fieldset>
 
