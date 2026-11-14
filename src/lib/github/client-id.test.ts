@@ -1,48 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readGitHubClientIdOverride, writeGitHubClientIdOverride } from "./client-id";
+import { beforeEach, describe, expect, it } from "vitest";
+import { getStoredGitHubClientId, setStoredGitHubClientId } from "./client-id";
 
-const STORAGE_KEY = "dnsconf.github-client-id";
-
-describe("the stored client ID", () => {
+describe("the client ID this container holds", () => {
   beforeEach(() => {
-    window.localStorage.clear();
+    setStoredGitHubClientId("");
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.localStorage.clear();
+  it("is nothing until one is set, which means the app's own", () => {
+    expect(getStoredGitHubClientId()).toBe("");
   });
 
-  it("comes back as it was written", () => {
-    writeGitHubClientIdOverride("Ov23liOwnAppClientId");
+  it("comes back as it was set", () => {
+    setStoredGitHubClientId("Ov23liOwnAppClientId");
 
-    expect(readGitHubClientIdOverride()).toBe("Ov23liOwnAppClientId");
+    expect(getStoredGitHubClientId()).toBe("Ov23liOwnAppClientId");
   });
 
-  it("is forgotten when written empty", () => {
-    writeGitHubClientIdOverride("Ov23liOwnAppClientId");
-    writeGitHubClientIdOverride("");
+  it("is forgotten when set empty", () => {
+    setStoredGitHubClientId("Ov23liOwnAppClientId");
+    setStoredGitHubClientId("");
 
-    expect(readGitHubClientIdOverride()).toBe("");
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
-
-  it("reads as nothing stored when the stored value is not a client ID", () => {
-    // Anything could be under this key: another version of the app, or someone editing storage by hand.
-    window.localStorage.setItem(STORAGE_KEY, "{}");
-
-    expect(readGitHubClientIdOverride()).toBe("");
-  });
-
-  it("survives storage that throws, as a private window's does", () => {
-    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
-      throw new Error("access denied");
-    });
-    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-      throw new Error("access denied");
-    });
-
-    expect(readGitHubClientIdOverride()).toBe("");
-    expect(() => writeGitHubClientIdOverride("Ov23liOwnAppClientId")).not.toThrow();
+    expect(getStoredGitHubClientId()).toBe("");
   });
 });

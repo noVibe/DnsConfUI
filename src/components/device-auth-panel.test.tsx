@@ -14,11 +14,10 @@ vi.mock("@/lib/github/device-flow", () => ({
   pollGitHubDeviceToken: deviceFlowMocks.pollToken,
 }));
 
-// `null` keeps the real, env-driven behaviour; a string forces that client ID,
-// which is the only way to reach the "nothing configured at all" state now
-// that a built-in client ID ships with the app. Nothing else is faked here:
-// `isUsingBuiltInGitHubClientId` is asked about the ID the panel is actually
-// authorizing with, which is the one the user typed when they typed one.
+// `null` keeps the client ID the app ships with; a string forces that one, which is the only way to reach the
+// "nothing to authorize with at all" state, since what ships is never empty. Nothing else is faked here:
+// `isUsingBuiltInGitHubClientId` is asked about the ID the panel is actually authorizing with, which is the one
+// the user typed when they typed one.
 const clientIdOverride = vi.hoisted(() => ({ value: null as string | null }));
 
 vi.mock("@/domain/github-app", async (importOriginal) => {
@@ -26,12 +25,24 @@ vi.mock("@/domain/github-app", async (importOriginal) => {
 
   return {
     ...actual,
-    getGitHubClientId: () =>
-      clientIdOverride.value === null ? actual.getGitHubClientId() : clientIdOverride.value,
+    get BUILT_IN_GITHUB_CLIENT_ID() {
+      return clientIdOverride.value === null ? actual.BUILT_IN_GITHUB_CLIENT_ID : clientIdOverride.value;
+    },
   };
 });
 
-const originalClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+/**
+ * The container's own copy of the setting, standing in for /api/github/client-id: what the panel posts is what
+ * the next page to ask gets back, which is the whole point of keeping it on the server rather than in a browser.
+ */
+const container = { clientId: "" };
+
+const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+  if (url !== "/api/github/client-id") throw new Error(`unexpected request to ${url}`);
+  if (init?.method === "POST") container.clientId = JSON.parse(String(init.body)).clientId;
+  return { ok: true, status: 200, json: async () => ({ clientId: container.clientId }) } as Response;
+});
+
 const sharedAppTitle = "Вход по общему ключу проекта";
 const ownAppTitle = "Вход по вашему ключу";
 const startAuthorization = "Начать подключение к GitHub";
@@ -72,8 +83,9 @@ describe("DeviceAuthPanel", () => {
     deviceFlowMocks.requestCode.mockReset();
     deviceFlowMocks.pollToken.mockReset();
     clientIdOverride.value = null;
-    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = "client-id";
-    window.localStorage.clear();
+    container.clientId = "";
+    fetchMock.mockClear();
+    vi.stubGlobal("fetch", fetchMock);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -82,12 +94,10 @@ describe("DeviceAuthPanel", () => {
 
   afterEach(() => {
     clientIdOverride.value = null;
-    window.localStorage.clear();
-    if (originalClientId === undefined) delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
-    else process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = originalClientId;
+    vi.unstubAllGlobals();
   });
 
-  it("offers the field instead of developer instructions when the build has no client ID", () => {
+  it("offers the field instead of developer instructions when there is no client ID to use", () => {
     clientIdOverride.value = "";
 
     renderPanel();
@@ -99,7 +109,6 @@ describe("DeviceAuthPanel", () => {
   });
 
   it("folds the shared-app notice away instead of standing between the user and the button", () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
     renderPanel();
 
@@ -112,7 +121,6 @@ describe("DeviceAuthPanel", () => {
   });
 
   it("starts authorization with the shared app without anything to acknowledge first", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     deviceFlowMocks.requestCode.mockResolvedValue(deviceCode);
 
     renderPanel();
@@ -123,18 +131,17 @@ describe("DeviceAuthPanel", () => {
     expect(deviceFlowMocks.requestCode).toHaveBeenCalledWith("");
   });
 
-  it("does not call it a shared app when the build configures one of its own", () => {
-    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = OWN_CLIENT_ID;
+  it("does not call it a shared app when the container already holds one of its own", async () => {
+    container.clientId = OWN_CLIENT_ID;
 
     renderPanel();
 
+    expect(await screen.findByText(ownAppTitle)).toBeInTheDocument();
     expect(screen.queryByText(sharedAppTitle)).not.toBeInTheDocument();
-    expect(screen.getByText(ownAppTitle)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: startAuthorization })).toBeInTheDocument();
   });
 
   it("authorizes through a client ID typed into the panel, with nothing rebuilt", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     deviceFlowMocks.requestCode.mockResolvedValue(deviceCode);
     deviceFlowMocks.pollToken.mockResolvedValue({ error: "authorization_pending" });
 
@@ -151,21 +158,19 @@ describe("DeviceAuthPanel", () => {
     expect(deviceFlowMocks.requestCode).toHaveBeenCalledWith(OWN_CLIENT_ID);
   });
 
-  it("remembers the typed client ID for the next time the page is opened", () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
-
+  // The container holds it, so it is there for the next page that opens - this browser's or anybody else's.
+  it("keeps the typed client ID for the next time the page is opened", async () => {
     const first = renderPanel();
     applyOwnClientId();
     first.unmount();
 
     renderPanel();
 
-    expect(screen.getByText(ownAppTitle)).toBeInTheDocument();
+    expect(await screen.findByText(ownAppTitle)).toBeInTheDocument();
     expect(screen.getByLabelText("Client ID вашего OAuth App")).toHaveValue(OWN_CLIENT_ID);
   });
 
   it("goes back to the shared app when the typed client ID is forgotten", () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
     renderPanel();
     applyOwnClientId();
@@ -173,11 +178,11 @@ describe("DeviceAuthPanel", () => {
 
     expect(screen.getByText(sharedAppTitle)).toBeInTheDocument();
     expect(screen.getByLabelText("Client ID вашего OAuth App")).toHaveValue("");
-    expect(window.localStorage.length).toBe(0);
+    // Forgotten by the container too, so another browser is not left authorizing with an app nobody wants.
+    expect(container.clientId).toBe("");
   });
 
   it("refuses a value that cannot be a client ID instead of authorizing with it", () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
 
     renderPanel();
     applyOwnClientId("not a client id");
@@ -188,7 +193,6 @@ describe("DeviceAuthPanel", () => {
   });
 
   it("offers the field again when authorization fails, which is when it is wanted most", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     deviceFlowMocks.requestCode.mockResolvedValue({ ...deviceCode, interval: 0 });
     // Hitting the shared app's hourly limit looks like this, and the way out of it is an app of one's own.
     deviceFlowMocks.pollToken.mockResolvedValue({ error: "access_denied", error_description: "denied" });
@@ -234,7 +238,6 @@ describe("DeviceAuthPanel", () => {
   });
 
   it("polls with the client ID the code was issued to", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
     deviceFlowMocks.requestCode.mockResolvedValue({ ...deviceCode, interval: 0 });
     deviceFlowMocks.pollToken.mockResolvedValue({ access_token: "github-token", token_type: "bearer", scope: "repo" });
 

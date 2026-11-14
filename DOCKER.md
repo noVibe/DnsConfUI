@@ -14,44 +14,7 @@ Start it and wait until it reports that the engine is **running** (the whale ico
 in the system tray / menu bar stops animating). Docker Desktop must stay open
 while you use the app.
 
-## Step 2 — a GitHub Client ID (optional, skip it the first time)
-
-The app signs you in through GitHub Device Flow, and it already ships with the
-Client ID of this project's own OAuth App — so there is **nothing to do here**.
-
-Two things are worth knowing about that shared app:
-
-- GitHub's authorization screen shows the **project owner's name**, not an app of yours.
-- GitHub allows **50 verification-code submissions per hour per app**, shared by
-  everyone using it. Under load, sign-in can fail for a while; retry later, or
-  switch to your own app as described below.
-
-Your GitHub token is unaffected either way: it stays in the browser tab and is
-never sent to or stored by this app.
-
-To use your own OAuth App instead — a one-time, one-minute setup:
-
-1. open <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**
-2. fill in anything you like, e.g.
-   - *Application name:* `DnsConf UI`
-   - *Homepage URL:* `http://localhost:3000`
-   - *Authorization callback URL:* `http://localhost:3000`
-3. click **Register application**
-4. on the app page tick **Enable Device Flow** and press **Update application**
-5. copy the **Client ID** (it looks like `Ov23li...`)
-
-The Client ID is not a secret — it is meant to be visible in the browser.
-Do **not** create a client secret; this app never uses one.
-
-Then paste it into the app itself: on the start screen open **"Signing in with
-the project's shared key"**, put the Client ID in the field and apply it. It
-takes effect at once, is remembered in your browser, and needs no rebuild and
-no restart.
-
-The same ID can be compiled into the image instead, through `.env` as shown in
-Step 3 — but that way needs a rebuild every time it changes.
-
-## Step 3 — start the app
+## Step 2 — start the app
 
 ### The easy way
 
@@ -71,25 +34,17 @@ From the folder that contains `docker-compose.yml`:
 docker compose up --build
 ```
 
-No `.env` file is required. If you did Step 2 and have a Client ID of your own,
-create one and paste the ID into it before building:
-
-```bash
-cp .env.example .env     # on Windows: copy .env.example .env
-```
-
-```ini
-NEXT_PUBLIC_GITHUB_CLIENT_ID=Ov23liYourClientIdHere
-```
+No `.env` file is required, and there is nothing to configure before building.
 
 The first build takes a few minutes (it downloads Node.js and compiles the app).
 Later starts take a couple of seconds.
 
-## Step 4 — open the app
+## Step 3 — open the app
 
 <http://localhost:3000>
 
-That's it.
+That's it. Nothing to sign in to and nothing to fill in: the app opens on the
+DNS monitor, and the GitHub part is behind a button at the bottom.
 
 ---
 
@@ -130,33 +85,63 @@ docker compose up --build -d
 
 ---
 
+## Using your own GitHub OAuth App
+
+The app signs you in through GitHub Device Flow and already ships with the Client
+ID of this project's own OAuth App, so **there is nothing to set up**. Two things
+are worth knowing about that shared app:
+
+- GitHub's authorization screen shows the **project owner's name**, not an app of yours.
+- GitHub allows **50 verification-code submissions per hour per app**, shared by
+  everyone using it. Under load, sign-in can fail for a while; retry later, or
+  use your own app.
+
+Your GitHub token is unaffected either way: it stays in the browser tab and is
+never sent to or stored by this app.
+
+To use an OAuth App of your own — a one-time, one-minute setup:
+
+1. open <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**
+2. fill in anything you like, e.g.
+   - *Application name:* `DnsConf UI`
+   - *Homepage URL:* `http://localhost:3000`
+   - *Authorization callback URL:* `http://localhost:3000`
+3. click **Register application**
+4. on the app page tick **Enable Device Flow** and press **Update application**
+5. copy the **Client ID** (it looks like `Ov23li...`)
+6. in this app, open **"Signing in with the project's shared key"** on the start
+   screen, paste the Client ID into the field and apply it
+
+That is the whole of it — no file to edit, no rebuild, no restart. The running
+container keeps the ID, so every browser that opens the app uses your OAuth App,
+not just the one you typed it into. Stopping the container forgets it and the
+app goes back to the shared key; the field takes an empty value to forget it
+sooner.
+
+The Client ID is not a secret — it is meant to be visible in the browser.
+Do **not** create a client secret; this app never uses one.
+
 ## Changing the configuration
 
-Everything lives in `.env`:
+There is one setting, and only if you need it:
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `NEXT_PUBLIC_GITHUB_CLIENT_ID` | no | Client ID of your own GitHub OAuth App (Device Flow enabled); empty means the project's shared app |
 | `HOST_PORT` | no | port on your machine; default `3000` |
-
-**After editing `.env`, always restart with `--build`:**
-
-```bash
-docker compose up --build -d
-```
-
-The Client ID is compiled into the browser bundle by Next.js, so a plain restart
-without `--build` would keep serving the previous value.
 
 ### Port 3000 is already taken
 
-Set another port in `.env`:
+Create `.env` if you have none, and set another port in it:
+
+```bash
+cp .env.example .env     # on Windows: copy .env.example .env
+```
 
 ```ini
 HOST_PORT=8080
 ```
 
-then `docker compose up --build -d` and open <http://localhost:8080>.
+then `docker compose up -d` and open <http://localhost:8080>.
 
 ---
 
@@ -164,8 +149,8 @@ then `docker compose up --build -d` and open <http://localhost:8080>.
 
 **Sign-in keeps failing with a rate-limit or "too many codes" error**
 GitHub allows 50 verification-code submissions per hour per OAuth App, and the
-app shipped with this project is shared by all of its users. Retry later, or do
-Step 2 and use your own Client ID.
+app shipped with this project is shared by all of its users. Retry later, or use
+your own Client ID (see *Using your own GitHub OAuth App* above).
 
 **`Cannot connect to the Docker daemon` / `error during connect`**
 Docker Desktop is not running. Start it, wait until it says *running*, try again.
@@ -174,13 +159,13 @@ Docker Desktop is not running. Start it, wait until it says *running*, try again
 Something else occupies the port. Set a different `HOST_PORT` in `.env` (see above).
 
 **The page asks for a developer setup / says the Client ID is required**
-Nothing is configured and the built-in fallback is unavailable — most likely the
-image was built from modified sources. Put a Client ID of your own into `.env`
-and rebuild: `docker compose up --build -d`.
+The client ID that ships with the app is missing — most likely the image was
+built from modified sources. Paste a Client ID of your own into the field the
+page is offering; nothing has to be rebuilt.
 
-**Your own Client ID is in `.env` but the warning about the shared app is still shown**
-The image still holds the old value. Next.js compiles the Client ID into the
-browser bundle, so rebuild: `docker compose up --build -d`.
+**The app still signs in through the shared key after you applied your own ID**
+The container was restarted, which forgets it. Apply it again on the start
+screen.
 
 **GitHub says the device flow is not enabled**
 Go back to your OAuth App page and tick **Enable Device Flow**.
@@ -222,12 +207,35 @@ docker compose up --build
 Запустите его и дождитесь состояния **running**. Docker Desktop должен быть
 запущен всё время, пока вы пользуетесь приложением.
 
-### 2. GitHub Client ID (необязательно, можно пропустить)
+### 2. Запустите
 
-Вход выполняется через GitHub Device Flow, и в приложение уже встроен Client ID
-OAuth App этого проекта — **делать ничего не нужно**.
+- **Windows:** двойной клик по файлу **`docker-start.cmd`**
+- **macOS / Linux:** в терминале **`./docker-start.sh`**
 
-Про это общее приложение стоит знать две вещи:
+Скрипт сам проверит Docker, создаст файл `.env` и всё соберёт. Ничего спрашивать
+он не будет.
+
+Или вручную — файл `.env` не обязателен:
+
+```bash
+docker compose up --build
+```
+
+Настраивать перед сборкой ничего не нужно.
+
+Первая сборка занимает несколько минут, последующие запуски — пару секунд.
+
+### 3. Откройте приложение
+
+<http://localhost:3000>
+
+Это всё: ни входа, ни настроек. Приложение открывается на DNS-мониторе, а часть
+про GitHub спрятана за кнопкой внизу.
+
+### Своё GitHub OAuth App
+
+В приложение уже встроен Client ID OAuth App этого проекта — **настраивать
+ничего не нужно**. Про это общее приложение стоит знать две вещи:
 
 - на странице подтверждения GitHub будет показано **имя владельца проекта**, а не вашего приложения;
 - GitHub разрешает **50 отправок кода подтверждения в час на одно приложение**
@@ -244,40 +252,16 @@ OAuth App этого проекта — **делать ничего не нуж�
 3. нажмите **Register application**
 4. на странице приложения поставьте галочку **Enable Device Flow** и сохраните
 5. скопируйте **Client ID** (вида `Ov23li...`)
+6. в приложении на начальном экране раскройте **«Вход по общему ключу проекта»**,
+   впишите Client ID в поле и нажмите «Применить»
+
+Это всё — ни файлов править, ни пересобирать, ни перезапускать. Запущенный
+контейнер хранит этот ID, поэтому через ваше OAuth App входят все браузеры, а не
+только тот, где вы его вписали. После остановки контейнера ID забывается и
+приложение снова использует общий ключ; чтобы забыть раньше, очистите поле.
 
 Client ID не является секретом — он и так виден в браузере. Client secret
 создавать не нужно, приложение его не использует.
-
-Дальше вставьте его прямо в приложении: на начальном экране раскройте
-**«Вход по общему ключу проекта»**, впишите Client ID в поле и нажмите
-«Применить». Он начнёт действовать сразу и запомнится в браузере — пересобирать
-и перезапускать ничего не нужно.
-
-Тот же ID можно вшить в образ через `.env` (шаг 3), но при таком способе после
-каждого изменения нужна пересборка.
-
-### 3. Запустите
-
-- **Windows:** двойной клик по файлу **`docker-start.cmd`**
-- **macOS / Linux:** в терминале **`./docker-start.sh`**
-
-Скрипт сам проверит Docker, создаст файл `.env` и всё соберёт. Ничего спрашивать
-он не будет.
-
-Или вручную — файл `.env` не обязателен:
-
-```bash
-docker compose up --build
-```
-
-Если вы сделали шаг 2 и у вас есть свой Client ID, сначала скопируйте
-`.env.example` в `.env` и впишите его в строку `NEXT_PUBLIC_GITHUB_CLIENT_ID=`.
-
-Первая сборка занимает несколько минут, последующие запуски — пару секунд.
-
-### 4. Откройте приложение
-
-<http://localhost:3000>
 
 ### Нужные команды
 
@@ -291,13 +275,13 @@ docker compose logs -f         # посмотреть логи
 
 - **Вход постоянно не удаётся из-за лимита** — GitHub разрешает 50 отправок кода
   подтверждения в час на одно приложение, а встроенное приложение проекта общее
-  для всех. Повторите позже или сделайте шаг 2 и укажите свой Client ID.
+  для всех. Повторите позже или укажите свой Client ID (см. «Своё GitHub OAuth App»).
 - **`Cannot connect to the Docker daemon`** — не запущен Docker Desktop.
-- **`port is already allocated`** — порт занят. Укажите в `.env` другой,
-  например `HOST_PORT=8080`, и снова выполните `docker compose up --build -d`.
-- **Страница просит настройку разработчика / Client ID** — ничего не настроено и
-  встроенное значение недоступно (скорее всего образ собран из изменённых
-  исходников). Впишите свой Client ID в `.env` и пересоберите:
-  `docker compose up --build -d`.
-- **После правки `.env` ничего не изменилось** — перезапускайте обязательно
-  с ключом `--build`: Next.js вшивает Client ID в сборку.
+- **`port is already allocated`** — порт занят. Скопируйте `.env.example` в
+  `.env`, укажите другой порт, например `HOST_PORT=8080`, и снова выполните
+  `docker compose up -d`.
+- **Страница просит настройку разработчика / Client ID** — встроенного значения
+  нет (скорее всего образ собран из изменённых исходников). Впишите свой Client
+  ID прямо в поле на странице, пересобирать ничего не нужно.
+- **После применения своего ID приложение снова входит по общему ключу** —
+  контейнер перезапускали, он забыл ID. Впишите его заново на начальном экране.

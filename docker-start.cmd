@@ -5,7 +5,7 @@ rem
 rem  Just double-click this file.
 rem
 rem  It creates .env on first run, then builds and starts the app with
-rem  Docker. Nothing has to be filled in: a GitHub Client ID is optional.
+rem  Docker. There is nothing to fill in.
 rem ---------------------------------------------------------------------------
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
@@ -46,23 +46,7 @@ if not exist ".env" (
   echo Created .env from .env.example
 )
 
-rem --- 3. the Client ID is optional ------------------------------------------
-set "CLIENT_ID="
-for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"NEXT_PUBLIC_GITHUB_CLIENT_ID=" ".env"`) do set "CLIENT_ID=%%B"
-
-if "!CLIENT_ID!"=="" (
-  echo.
-  echo No GitHub Client ID in .env - the project's shared GitHub app will be used.
-  echo Nothing else to do. If you would rather use your own OAuth App later:
-  echo   1. open https://github.com/settings/developers
-  echo   2. New OAuth App  -^>  any name, homepage http://localhost:3000
-  echo   3. after creating it, tick "Enable Device Flow" and save
-  echo   4. put the Client ID into NEXT_PUBLIC_GITHUB_CLIENT_ID in .env
-  echo   5. run this file again
-  echo.
-)
-
-rem --- 4. build and run -------------------------------------------------------
+rem --- 3. build and run -------------------------------------------------------
 set "HOST_PORT="
 for /f "usebackq tokens=1,* delims==" %%A in (`findstr /b /c:"HOST_PORT=" ".env"`) do set "HOST_PORT=%%B"
 set "HOST_PORT=!HOST_PORT: =!"

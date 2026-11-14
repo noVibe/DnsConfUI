@@ -5,7 +5,7 @@
 #   ./docker-start.sh
 #
 # Creates .env on first run, then builds and starts the app with Docker.
-# Nothing has to be filled in: a GitHub Client ID is optional.
+# There is nothing to fill in.
 # ---------------------------------------------------------------------------
 set -e
 
@@ -42,21 +42,7 @@ if [ ! -f .env ]; then
   say "Created .env from .env.example"
 fi
 
-# --- 3. the Client ID is optional ------------------------------------------
-CLIENT_ID=$(grep -E '^NEXT_PUBLIC_GITHUB_CLIENT_ID=' .env | head -n 1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r')
-
-if [ -z "$CLIENT_ID" ]; then
-  say ""
-  say "No GitHub Client ID in .env - the project's shared GitHub app will be used."
-  say "Nothing else to do. If you would rather use your own OAuth App later:"
-  say "  1. open https://github.com/settings/developers"
-  say "  2. New OAuth App -> any name, homepage http://localhost:3000"
-  say "  3. after creating it, tick 'Enable Device Flow' and save"
-  say "  4. put the Client ID into NEXT_PUBLIC_GITHUB_CLIENT_ID in .env"
-  say "  5. run this script again"
-fi
-
-# --- 4. build and run -------------------------------------------------------
+# --- 3. build and run -------------------------------------------------------
 HOST_PORT=$(grep -E '^HOST_PORT=' .env | head -n 1 | cut -d= -f2- | tr -d '[:space:]' | tr -d '\r')
 [ -z "$HOST_PORT" ] && HOST_PORT=3000
 

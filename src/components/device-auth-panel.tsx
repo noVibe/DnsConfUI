@@ -2,8 +2,7 @@
 
 import { Check, ChevronDown, Copy, GitBranch, KeyRound, Loader2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { getGitHubClientId, isPlausibleGitHubClientId, isUsingBuiltInGitHubClientId } from "@/domain/github-app";
-import { readGitHubClientIdOverride, writeGitHubClientIdOverride } from "@/lib/github/client-id";
+import { BUILT_IN_GITHUB_CLIENT_ID, isPlausibleGitHubClientId, isUsingBuiltInGitHubClientId } from "@/domain/github-app";
 import { requestGitHubDeviceCode, pollGitHubDeviceToken, type DeviceCodeResponse } from "@/lib/github/device-flow";
 import { useAuth } from "./auth-provider";
 import { useLocale } from "@/lib/i18n/context";
@@ -47,23 +46,33 @@ export function DeviceAuthPanel() {
   const pollingRef = useRef<number | null>(null);
 
   /**
-   * The client ID typed into this panel, which wins over the one the build was given.
+   * The client ID this container has been told to authorize with, which wins over the one the app ships with.
    *
-   * This is how someone running the app locally authorizes through an OAuth App of their own: a client ID is public
-   * by design and the device flow uses no client secret, so there is nothing here to protect and nothing to
-   * rebuild - the value only travels to GitHub as `client_id`.
+   * This is how someone running the app uses an OAuth App of their own: a client ID is public by design and the
+   * device flow uses no client secret, so there is nothing here to protect and nothing to rebuild - the value
+   * only travels to GitHub as `client_id`. The container holds it, so every browser that opens the app gets it.
    */
   const [ownClientId, setOwnClientId] = useState("");
   const [draft, setDraft] = useState("");
   const [draftInvalid, setDraftInvalid] = useState(false);
 
-  // Read after mount rather than during render: localStorage does not exist while the page is rendered on the
-  // server, so a value read in the render body would make the first client render disagree with its own HTML.
+  // Asked for after mount, because the container is what holds it: there is nothing to read while the page is
+  // rendered on the server, and a value read in the render body would make the first client render disagree
+  // with the HTML it is hydrating.
   useEffect(() => {
-    const stored = readGitHubClientIdOverride();
-    if (stored === "") return;
-    setOwnClientId(stored);
-    setDraft(stored);
+    let mounted = true;
+    fetch("/api/github/client-id")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        const stored = typeof body?.clientId === "string" ? body.clientId : "";
+        if (!mounted || stored === "") return;
+        setOwnClientId(stored);
+        setDraft(stored);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -74,7 +83,7 @@ export function DeviceAuthPanel() {
     };
   }, []);
 
-  const clientId = ownClientId || getGitHubClientId();
+  const clientId = ownClientId || BUILT_IN_GITHUB_CLIENT_ID;
   const usesSharedApp = isUsingBuiltInGitHubClientId(clientId);
   // Only reachable in a build whose client ID was deliberately emptied; the field below is the way out of it.
   const noClientId = clientId === "";
@@ -88,7 +97,13 @@ export function DeviceAuthPanel() {
   function adoptClientId(value: string) {
     if (pollingRef.current) window.clearTimeout(pollingRef.current);
     setOwnClientId(value);
-    writeGitHubClientIdOverride(value);
+    // Told to the container, so the next browser to open the app authorizes with it too. A failure here costs it
+    // that and nothing more: every device-flow request carries the ID this panel is holding.
+    void fetch("/api/github/client-id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId: value })
+    }).catch(() => {});
     setDraft(value);
     setDraftInvalid(false);
     setDevice(null);
@@ -215,7 +230,7 @@ export function DeviceAuthPanel() {
         <p id={fieldHintId} className="text-xs leading-5 text-ink/50">
           {t('auth.app.fieldHint')}
         </p>
-        {/* Nothing here about NEXT_PUBLIC_GITHUB_CLIENT_ID: the field is the answer, and .env is for DOCKER.md. */}
+        {/* This field is the whole of it: there is no file to edit and nothing to rebuild. */}
         {ownClientId ? (
           <p className="text-xs leading-5 text-ink/60">
             {t('auth.app.inUse', { clientId: ownClientId })}{" "}

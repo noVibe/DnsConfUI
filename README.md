@@ -88,22 +88,13 @@ To use an app of your own instead:
 3. Paste its **Client ID** into the field on the app's own start screen, under
    *"Signing in with the project's shared key"*
 
-That takes effect immediately and is remembered in your browser: no rebuild, no
-restart, no environment variable. The Client ID is not a secret — it is part of
-every authorization request and is visible in the browser by design — and this
-app never uses a client secret.
+That takes effect immediately: no rebuild, no restart, no environment variable.
+The container keeps it for as long as it runs, so every browser that opens the
+app signs in through your OAuth App, not only the one you typed it into.
+Restarting the container forgets it and the app goes back to the shared key.
 
-The same ID can be compiled into the image instead, for a deployment that should
-come up already configured:
-
-```bash
-cp .env.example .env     # on Windows: copy .env.example .env
-# Set NEXT_PUBLIC_GITHUB_CLIENT_ID in .env
-docker compose up --build -d
-```
-
-That way needs the rebuild: Next.js compiles the value into the browser bundle,
-so `--build` is what picks up a change.
+The Client ID is not a secret — it is part of every authorization request and is
+visible in the browser by design — and this app never uses a client secret.
 
 **[DOCKER.md](DOCKER.md) has the full step-by-step guide and troubleshooting
 (also in Russian / на русском).**
@@ -117,8 +108,8 @@ npm install
 npm run dev
 ```
 
-To authorize through your own OAuth App, copy `.env.example` to `.env.local`
-and set `NEXT_PUBLIC_GITHUB_CLIENT_ID` there.
+To authorize through your own OAuth App, paste its Client ID into the field on
+the app's start screen, exactly as above.
 
 ## Tests
 

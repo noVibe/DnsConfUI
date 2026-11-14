@@ -1,25 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILT_IN_GITHUB_CLIENT_ID } from "@/domain/github-app";
+import { setStoredGitHubClientId } from "@/lib/github/client-id";
 import { POST as requestCode } from "./code/route";
 import { POST as requestToken } from "./token/route";
 
-// `null` keeps the real, env-driven behaviour; a string forces that client ID,
-// which is the only way to reach the "nothing configured at all" state now
-// that a built-in client ID ships with the app.
-const clientIdOverride = vi.hoisted(() => ({ value: null as string | null }));
-
-vi.mock("@/domain/github-app", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/domain/github-app")>();
-
-  return {
-    ...actual,
-    getGitHubClientId: () =>
-      clientIdOverride.value === null ? actual.getGitHubClientId() : clientIdOverride.value,
-  };
-});
-
 const fetchMock = vi.fn();
-const originalClientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+/** An OAuth App named in the UI, which this container then authorizes with until it is restarted. */
+const CONTAINER_APP = "Ov23liContainerApp";
 
 function tokenRequest(body: unknown) {
   return new Request("http://localhost/api/github/device/token", {
@@ -29,7 +16,7 @@ function tokenRequest(body: unknown) {
   });
 }
 
-/** The browser names the app to authorize with, or sends an empty string for "the one this build has". */
+/** The browser names the app to authorize with, or sends an empty string for "the one this container has". */
 function codeRequest(body: unknown = { client_id: "" }) {
   return new Request("http://localhost/api/github/device/code", {
     method: "POST",
@@ -42,29 +29,16 @@ describe("GitHub device flow routes", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
-    clientIdOverride.value = null;
-    process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = "client-id";
+    setStoredGitHubClientId(CONTAINER_APP);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    clientIdOverride.value = null;
-    if (originalClientId === undefined) delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
-    else process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID = originalClientId;
+    setStoredGitHubClientId("");
   });
 
-  it("reports a missing GitHub client ID", async () => {
-    clientIdOverride.value = "";
-
-    const response = await requestCode(codeRequest());
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ message: "GitHub client ID is not configured." });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("falls back to the built-in client ID when none is configured", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  it("falls back to the built-in client ID when the container holds none", async () => {
+    setStoredGitHubClientId("");
     fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
 
     const response = await requestCode(codeRequest());
@@ -75,8 +49,8 @@ describe("GitHub device flow routes", () => {
     }));
   });
 
-  it("exchanges the device code with the built-in client ID when none is configured", async () => {
-    delete process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID;
+  it("exchanges the device code with the built-in client ID when the container holds none", async () => {
+    setStoredGitHubClientId("");
     fetchMock.mockResolvedValue({ status: 200, json: async () => ({ access_token: "token" }) });
 
     const response = await requestToken(tokenRequest({ device_code: "dc" }));
@@ -99,7 +73,7 @@ describe("GitHub device flow routes", () => {
     await expect(response.json()).resolves.toEqual({ device_code: "dc" });
     expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
       method: "POST",
-      body: JSON.stringify({ client_id: "client-id", scope: "repo workflow read:user" }),
+      body: JSON.stringify({ client_id: CONTAINER_APP, scope: "repo workflow read:user" }),
     }));
   });
 
@@ -126,7 +100,7 @@ describe("GitHub device flow routes", () => {
     await expect(response.json()).resolves.toEqual({ error: "authorization_pending" });
     expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/oauth/access_token", expect.objectContaining({
       body: JSON.stringify({
-        client_id: "client-id",
+        client_id: CONTAINER_APP,
         device_code: "dc",
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       }),
@@ -170,14 +144,14 @@ describe("GitHub device flow routes", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("takes a request with no client ID in it as the build's own", async () => {
+  it("takes a request with no client ID in it as the container's own", async () => {
     fetchMock.mockResolvedValue({ status: 200, json: async () => ({ device_code: "dc" }) });
 
     const response = await requestCode(codeRequest({}));
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledWith("https://github.com/login/device/code", expect.objectContaining({
-      body: JSON.stringify({ client_id: "client-id", scope: "repo workflow read:user" }),
+      body: JSON.stringify({ client_id: CONTAINER_APP, scope: "repo workflow read:user" }),
     }));
   });
 });

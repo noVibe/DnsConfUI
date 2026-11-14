@@ -26,12 +26,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# The GitHub OAuth Client ID is a public value (it ends up in the browser
-# bundle), and Next.js inlines NEXT_PUBLIC_* variables at build time — so it
-# has to be available while building, not only at runtime.
-ARG NEXT_PUBLIC_GITHUB_CLIENT_ID=""
-ENV NEXT_PUBLIC_GITHUB_CLIENT_ID=$NEXT_PUBLIC_GITHUB_CLIENT_ID
-
+# Nothing about the GitHub OAuth App is baked in: the app ships with a client
+# ID, and an OAuth App of your own is named in the UI, which the container then
+# remembers for as long as it runs.
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 

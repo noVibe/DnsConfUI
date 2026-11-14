@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getGitHubClientId, resolveGitHubClientId } from "@/domain/github-app";
+import { BUILT_IN_GITHUB_CLIENT_ID, resolveGitHubClientId } from "@/domain/github-app";
+import { getStoredGitHubClientId } from "@/lib/github/client-id";
 
 const tokenRequestSchema = z.object({
   device_code: z.string().min(1),
@@ -18,14 +19,10 @@ export async function POST(request: Request) {
 
   // The same app that issued the device code has to redeem it, so this must be
   // resolved exactly as the code request resolved it.
-  const gitHubClientId = resolveGitHubClientId(parsed.data.client_id, getGitHubClientId());
+  const gitHubClientId = resolveGitHubClientId(parsed.data.client_id, getStoredGitHubClientId() || BUILT_IN_GITHUB_CLIENT_ID);
 
   if (gitHubClientId === null) {
     return NextResponse.json({ message: "That is not a GitHub client ID." }, { status: 400 });
-  }
-
-  if (!gitHubClientId) {
-    return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
   }
 
   const response = await fetch("https://github.com/login/oauth/access_token", {

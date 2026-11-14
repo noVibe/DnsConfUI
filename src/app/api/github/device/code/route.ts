@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getGitHubClientId, resolveGitHubClientId } from "@/domain/github-app";
+import { BUILT_IN_GITHUB_CLIENT_ID, resolveGitHubClientId } from "@/domain/github-app";
+import { getStoredGitHubClientId } from "@/lib/github/client-id";
 
 /**
  * Starts the device flow.
@@ -10,14 +11,11 @@ import { getGitHubClientId, resolveGitHubClientId } from "@/domain/github-app";
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { client_id?: unknown } | null;
-  const gitHubClientId = resolveGitHubClientId(body?.client_id, getGitHubClientId());
+  // The app this container is set to, which is the one it ships with until someone names another in the UI.
+  const gitHubClientId = resolveGitHubClientId(body?.client_id, getStoredGitHubClientId() || BUILT_IN_GITHUB_CLIENT_ID);
 
   if (gitHubClientId === null) {
     return NextResponse.json({ message: "That is not a GitHub client ID." }, { status: 400 });
-  }
-
-  if (!gitHubClientId) {
-    return NextResponse.json({ message: "GitHub client ID is not configured." }, { status: 500 });
   }
 
   const response = await fetch("https://github.com/login/device/code", {

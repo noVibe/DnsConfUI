@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isCheckableDonor, isDnsDonorPreset, type DnsDonor } from "@/domain/dns-donors";
+import { isSameOrigin } from "@/lib/http/same-origin";
 
 /** Long enough to tell two servers apart, short enough to sit in the monitor's first column. */
 const MAX_LABEL_LENGTH = 24;
@@ -31,18 +32,6 @@ const added: DnsDonor[] = [];
 
 export function GET() {
   return NextResponse.json({ donors: added });
-}
-
-/**
- * Keeps another tab's page from adding or removing servers behind the user's back: a cross-origin fetch with a
- * plain content type needs no preflight, so only the caller's own origin tells the two apart.
- *
- * Browsers send this header on every fetch - `same-origin` for the app's own calls, `cross-site` or `same-site`
- * for another page's. Callers that are not a browser, such as curl, send none, so an absent header is allowed.
- */
-function isSameOrigin(request: Request) {
-  const site = request.headers.get("sec-fetch-site");
-  return site === null || site === "same-origin";
 }
 
 export async function POST(request: Request) {

@@ -5,9 +5,9 @@
 #
 # Then open http://localhost:3000
 #
-# No .env file is needed: without one the app signs you in through the
-# project's own GitHub OAuth App. Copy .env.example to .env and set
-# NEXT_PUBLIC_GITHUB_CLIENT_ID there to use an OAuth App of your own instead.
+# No .env file is needed: the app signs you in through the project's own GitHub
+# OAuth App, and an OAuth App of your own is named in the UI instead, with no
+# rebuild. .env is only there to move the app off port 3000.
 # ---------------------------------------------------------------------------
 
 services:
@@ -15,19 +15,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # Read from the .env file next to this file — optional. When it is
-        # empty or absent, the app falls back to the client ID built into the
-        # source (see src/domain/github-app.ts).
-        NEXT_PUBLIC_GITHUB_CLIENT_ID: '${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}'
 
     image: dnsconf-ui:local
     container_name: dnsconf-ui
 
-    # The server routes read the Client ID at runtime as well; empty here
-    # means the built-in one is used.
     environment:
-      NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
