@@ -2,6 +2,8 @@ name: Tests
 
 on:
   pull_request:
+  # So the image that gets published is the one these tests passed on.
+  workflow_call:
 
 permissions:
   contents: read

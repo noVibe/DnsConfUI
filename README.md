@@ -50,7 +50,27 @@ in profile order; disabled profiles use `-` to preserve positional mapping.
 
 ## Quick start
 
-### Run with Docker — recommended
+### Run the published image — nothing to download
+
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then run
+one command:
+
+```bash
+docker run -d -p 3000:3000 --name dnsconf-ui --restart unless-stopped ghcr.io/novibe/dnsconfui
+```
+
+Open http://localhost:3000. There is no repository to clone, nothing to build and
+nothing to fill in.
+
+```bash
+docker logs -f dnsconf-ui    # logs
+docker rm -f dnsconf-ui      # stop and remove
+docker pull ghcr.io/novibe/dnsconfui   # update, then run the first command again
+```
+
+Port 3000 taken? Use `-p 8080:3000` and open http://localhost:8080 instead.
+
+### Run from a copy of this repository
 
 Only Docker is needed, no Node.js and no npm.
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then:

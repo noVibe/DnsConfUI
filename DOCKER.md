@@ -16,6 +16,28 @@ while you use the app.
 
 ## Step 2 — start the app
 
+### Without downloading anything
+
+If you only want to run the app, one command is the whole of it — no copy of this
+repository, no build:
+
+```bash
+docker run -d -p 3000:3000 --name dnsconf-ui --restart unless-stopped ghcr.io/novibe/dnsconfui
+```
+
+Then skip to Step 3. Everyday commands for this way of running it:
+
+```bash
+docker logs -f dnsconf-ui              # logs
+docker rm -f dnsconf-ui                # stop and remove
+docker pull ghcr.io/novibe/dnsconfui   # update, then run the first command again
+```
+
+Port 3000 already taken? Use `-p 8080:3000` and open <http://localhost:8080>.
+
+The rest of this page is for running it from a copy of the repository, which is
+what you want if you intend to change the code.
+
 ### The easy way
 
 | Your system | What to do |
@@ -208,6 +230,29 @@ docker compose up --build
 запущен всё время, пока вы пользуетесь приложением.
 
 ### 2. Запустите
+
+#### Ничего не скачивая
+
+Если вы просто хотите пользоваться приложением, достаточно одной команды — без
+копии репозитория и без сборки:
+
+```bash
+docker run -d -p 3000:3000 --name dnsconf-ui --restart unless-stopped ghcr.io/novibe/dnsconfui
+```
+
+Дальше переходите к шагу 3. Нужные команды при таком запуске:
+
+```bash
+docker logs -f dnsconf-ui              # логи
+docker rm -f dnsconf-ui                # остановить и удалить
+docker pull ghcr.io/novibe/dnsconfui   # обновить, затем снова выполнить первую команду
+```
+
+Занят порт 3000? Укажите `-p 8080:3000` и откройте <http://localhost:8080>.
+
+Ниже — запуск из копии репозитория, он нужен, если вы собираетесь менять код.
+
+#### Из копии репозитория
 
 - **Windows:** двойной клик по файлу **`docker-start.cmd`**
 - **macOS / Linux:** в терминале **`./docker-start.sh`**
