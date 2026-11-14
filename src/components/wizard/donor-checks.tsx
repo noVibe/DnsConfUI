@@ -80,7 +80,15 @@ export function useDonorChecks() {
     const chatgptKey = {
       checking: "profiles.donorCheckChatgptChecking",
       ok: direct ? (country ? "profiles.donorCheckChatgptDirect" : "profiles.donorCheckChatgptDirectUnknown") : "profiles.donorCheckChatgptOk",
-      fail: direct && country ? "profiles.donorCheckChatgptDirectBlocked" : country ? "profiles.donorCheckChatgptBlocked" : "profiles.donorCheckChatgptFail"
+      fail: direct && country
+        ? "profiles.donorCheckChatgptDirectBlocked"
+        : country
+          ? "profiles.donorCheckChatgptBlocked"
+          : check?.reason === "no-address"
+            ? "profiles.donorCheckChatgptNoAddress"
+            : check?.reason === "unreachable"
+              ? "profiles.donorCheckChatgptUnreachable"
+              : "profiles.donorCheckChatgptFail"
     } as const;
     return {
       dns,

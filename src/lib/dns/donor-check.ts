@@ -2,9 +2,16 @@
  * Elapsed milliseconds for each passed check (null when failed) and the exit country chatgpt.com saw.
  * `direct` means the DNS does not proxy chatgpt.com, so the connection exits from the visitor's own network.
  */
-export type DonorCheck = { dnsMs: number | null; chatgptMs: number | null; country: string | null; direct: boolean };
+export type DonorCheck = {
+  dnsMs: number | null;
+  chatgptMs: number | null;
+  country: string | null;
+  direct: boolean;
+  /** Why the chatgpt.com check failed when the country does not say it; see the check route. */
+  reason: "no-address" | "unreachable" | null;
+};
 
-const FAILED: DonorCheck = { dnsMs: null, chatgptMs: null, country: null, direct: false };
+const FAILED: DonorCheck = { dnsMs: null, chatgptMs: null, country: null, direct: false, reason: null };
 
 export function checkDonor(donor: string): Promise<DonorCheck> {
   return fetch("/api/donors/check", {

@@ -14,9 +14,23 @@ const requestSchema = z.object({ donor: z.string().refine(isCheckableDonor) });
  * `direct` means the DNS does not proxy chatgpt.com: the connection leaves from wherever the user is, so the
  * country is left to the browser to fill in instead of reporting this server's own location.
  */
-type CheckResult = { dnsMs: number | null; chatgptMs: number | null; country: string | null; direct: boolean };
+type CheckResult = {
+  dnsMs: number | null;
+  chatgptMs: number | null;
+  country: string | null;
+  direct: boolean;
+  /**
+   * Why the chatgpt.com check failed, when the answer alone does not say.
+   *
+   * A failure that comes with a country explains itself - the proxy works and exits somewhere chatgpt.com refuses -
+   * and a DNS that did not answer is already reported in its own column. What is left are the two that look
+   * identical in the table and are not: a resolver that returned nothing usable, and one whose address does not
+   * answer on 443 at all.
+   */
+  reason: "no-address" | "unreachable" | null;
+};
 
-const FAILED: CheckResult = { dnsMs: null, chatgptMs: null, country: null, direct: false };
+const FAILED: CheckResult = { dnsMs: null, chatgptMs: null, country: null, direct: false, reason: null };
 const EXIT_IP_TTL_MS = 5 * 60_000;
 
 // Concurrent requests for a donor share one check, so repeated calls cannot multiply outbound connections.
@@ -52,6 +66,7 @@ async function check(donor: string): Promise<CheckResult> {
 
   // A custom DoH server can answer with any address, so internal ones are never contacted.
   const candidates = addresses.filter(isPublicAddress).slice(0, 4);
+  if (candidates.length === 0) return { ...FAILED, dnsMs, reason: "no-address" };
   const traces = candidates.map((ip) => traceCountry(ip, CHECK_HOST, TIMEOUT_MS));
   const serverIp = await ownIp;
   const isDirect = (trace: { ip: string }) => trace.ip === serverIp;
@@ -63,11 +78,12 @@ async function check(donor: string): Promise<CheckResult> {
   })).catch(() => null);
   if (passed) {
     const direct = isDirect(passed);
-    return { dnsMs, chatgptMs: passed.ms, country: direct ? null : passed.country, direct };
+    return { dnsMs, chatgptMs: passed.ms, country: direct ? null : passed.country, direct, reason: null };
   }
 
+  // An address that answered from a country chatgpt.com refuses is explained by that country, not by a reason.
   const answered = (await Promise.all(traces)).find(Boolean);
-  return { ...FAILED, dnsMs, country: answered?.country ?? null };
+  return { ...FAILED, dnsMs, country: answered?.country ?? null, reason: answered ? null : "unreachable" };
 }
 
 export async function POST(request: Request) {

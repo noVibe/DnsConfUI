@@ -9,8 +9,7 @@ export const DNS_DONORS: readonly { label: string; value: string; site?: string 
   { label: "WLRUS", value: "https://dns.wlrus.cfd/dns-query", site: "https://site.dns.wlrus.cfd" },
   { label: "Malw", value: "https://dns.malw.link/dns-query", site: "https://info.dns.malw.link" },
   { label: "Dagami", value: "https://dns.dagami.ru/dns-query", site: "https://dns.dagami.ru" },
-  { label: "DNS-AI", value: "https://dns.dns-ai.ru/dns-query", site: "https://dns-ai.ru" },
-  { label: "Zapret", value: "https://dns.zapret.moe/dns-query", site: "https://dns.zapret.moe" }
+  { label: "DNS-AI", value: "https://dns.dns-ai.ru/dns-query", site: "https://dns-ai.ru" }
 ];
 
 export const DEFAULT_DNS_DONOR = DNS_DONORS[0].value;

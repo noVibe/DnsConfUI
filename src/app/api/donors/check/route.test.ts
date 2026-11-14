@@ -72,13 +72,28 @@ describe("POST /api/donors/check", () => {
     expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: 50, country: "DE", direct: false });
   });
 
-  it("fails the chatgpt.com check when no address answers", async () => {
+  it("fails the chatgpt.com check when no address answers, and says so", async () => {
     dohMocks.resolveA.mockResolvedValue(["1.1.1.1"]);
     dohMocks.traceCountry.mockResolvedValue(null);
 
-    const response = await POST(checkRequest({ donor: "https://dns.zapret.moe/dns-query" }));
+    const response = await POST(checkRequest({ donor: "https://dns.dns-ai.ru/dns-query" }));
 
-    expect(await response.json()).toMatchObject({ dnsMs: expect.any(Number), chatgptMs: null, country: null, direct: false });
+    expect(await response.json()).toMatchObject({
+      dnsMs: expect.any(Number),
+      chatgptMs: null,
+      country: null,
+      direct: false,
+      reason: "unreachable"
+    });
+  });
+
+  it("separates a resolver that answered with nothing usable from one whose address is dead", async () => {
+    dohMocks.resolveA.mockResolvedValue(["10.0.0.1"]);
+
+    const response = await POST(checkRequest({ donor: "https://dns.dagami.ru/dns-query" }));
+
+    expect(await response.json()).toMatchObject({ chatgptMs: null, reason: "no-address" });
+    expect(dohMocks.traceCountry).not.toHaveBeenCalledWith(expect.anything(), "chatgpt.com", expect.anything());
   });
 
   it("fails both checks when the donor does not resolve", async () => {
@@ -86,7 +101,7 @@ describe("POST /api/donors/check", () => {
 
     const response = await POST(checkRequest({ donor: "https://dns.dagami.ru/dns-query" }));
 
-    expect(await response.json()).toEqual({ dnsMs: null, chatgptMs: null, country: null, direct: false });
+    expect(await response.json()).toEqual({ dnsMs: null, chatgptMs: null, country: null, direct: false, reason: null });
     expect(dohMocks.traceCountry).not.toHaveBeenCalledWith(expect.anything(), "chatgpt.com", expect.anything());
   });
 

@@ -43,7 +43,7 @@ export const locale: Record<LocaleKey, string> = {
   "monitor.custom.tag": "свой",
 
   "hosts.title": "Обновление файла hosts",
-  "hosts.tooltip": "В готовом файле hosts каждый домен закреплён за адресом прокси, который работал на момент сборки списка. Здесь тот же файл собирается заново с адресами, которые работают сейчас.",
+  "hosts.tooltip": "Пересобирает выбранный файл hosts с адресами прокси, которые работают сейчас.",
   "hosts.base.legend": "Исходный файл",
   "hosts.base.list": "Готовый список",
   "hosts.base.listLabel": "Какой готовый список",
@@ -166,6 +166,8 @@ export const locale: Record<LocaleKey, string> = {
   "profiles.donorCheckChatgptDirectUnknown": "ChatGPT: без прокси, напрямую из вашей сети, {ms} мс",
   "profiles.donorCheckChatgptDirectBlocked": "ChatGPT: без прокси, а из {country} он не работает",
   "profiles.donorCheckChatgptFail": "ChatGPT: не открывается",
+  "profiles.donorCheckChatgptNoAddress": "ChatGPT: этот DNS не дал ни одного адреса для chatgpt.com",
+  "profiles.donorCheckChatgptUnreachable": "ChatGPT: адрес, который дал этот DNS, не отвечает",
   "profiles.credentialsRetained": "CLIENT_ID и AUTH_SECRET — без изменений.",
 
   "script.title": "Поведение скрипта",

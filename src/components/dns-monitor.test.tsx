@@ -46,7 +46,7 @@ describe("DnsMonitor", () => {
     expect(within(row).getByRole("link", { name: "GeoHide RU" })).toHaveAttribute("href", "https://geohide.ru");
     expect(within(row).getByText("DNS: отвечает, 90 мс")).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(DNS_DONORS.length + 1);
-    expect(screen.getByRole("link", { name: "Zapret" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "DNS-AI" })).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("link", { name: "Comss" })).toHaveAttribute("href", "https://www.comss.ru/page.php?id=7315");
   });
 

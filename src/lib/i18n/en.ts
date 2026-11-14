@@ -41,7 +41,7 @@ export const locale = {
   "monitor.custom.tag": "custom",
 
   "hosts.title": "Refresh a hosts file",
-  "hosts.tooltip": "A published hosts file pins every domain to a proxy address that worked when the list was built. Here the same file is rebuilt with addresses that work now.",
+  "hosts.tooltip": "Rebuilds the chosen hosts file with proxy addresses that work right now.",
   "hosts.base.legend": "Base file",
   "hosts.base.list": "Published list",
   "hosts.base.listLabel": "Which published list",
@@ -164,6 +164,8 @@ export const locale = {
   "profiles.donorCheckChatgptDirectUnknown": "ChatGPT: no proxy, direct from your network, {ms} ms",
   "profiles.donorCheckChatgptDirectBlocked": "ChatGPT: no proxy, and it doesn't work from {country}",
   "profiles.donorCheckChatgptFail": "ChatGPT: doesn't open",
+  "profiles.donorCheckChatgptNoAddress": "ChatGPT: this DNS gave no address for chatgpt.com",
+  "profiles.donorCheckChatgptUnreachable": "ChatGPT: the address this DNS gave does not answer",
   "profiles.credentialsRetained": "CLIENT_ID and AUTH_SECRET remain unchanged.",
 
   "script.title": "Script behaviour",
