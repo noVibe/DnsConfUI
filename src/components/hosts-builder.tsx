@@ -2,9 +2,10 @@
 
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
-import { DEFAULT_DNS_DONOR, getDnsDonorLabel } from "@/domain/dns-donors";
+import { DNS_DONORS } from "@/domain/dns-donors";
 import {
   applyOverrides,
+  hostFamily,
   overridableHostnames,
   parseHosts,
   summarizeHosts,
@@ -22,8 +23,8 @@ import {
 import { useLocale } from "@/lib/i18n/context";
 import { Button, SecondaryButton, cn, inputClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useDonorChecks } from "@/components/wizard/donor-checks";
-import { DonorSelect } from "@/components/wizard/donor-select";
+import { useCustomDonors } from "@/components/wizard/custom-donors";
+import { useDonorChecks, type CheckedDonor } from "@/components/wizard/donor-checks";
 
 /** The resolve route's own ceiling, so a batch is as large as it is allowed to be. */
 const BATCH_SIZE = 50;
@@ -40,8 +41,11 @@ const MAX_IN_FLIGHT = 2;
  * Five still leaves half of the route's ten-batch ceiling free for the ping table's own checks.
  */
 const SWEEP_IN_FLIGHT = 5;
-/** More donors than this only lengthen the per-hostname walk the server does on a miss. */
-const MAX_DONORS = 4;
+/**
+ * How many proxies one run may use: the resolve route's own ceiling, so a batch is never refused for carrying too
+ * many. Ticking more than this is what the list stops, rather than silently dropping the ones past it.
+ */
+const MAX_DONORS = 11;
 /**
  * How many domains go out under the full ranked donor list before the run narrows to the leaders.
  *
@@ -66,7 +70,6 @@ const MAX_RETRIES = 4;
 
 type Phase = "idle" | "loading" | "ready" | "ranking" | "resolving" | "sweeping" | "done";
 type BaseKind = "list" | "url" | "file";
-type Mode = "auto" | "specific";
 
 type Base = { readonly parsed: ParsedHostsFile; readonly summary: HostsSummary; readonly origin: string };
 type Progress = { readonly total: number; readonly done: number; readonly resolved: number; readonly kept: number };
@@ -87,6 +90,46 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   const batches: T[][] = [];
   for (let start = 0; start < items.length; start += size) batches.push(items.slice(start, start + size));
   return batches;
+}
+
+/**
+ * Batches that keep a site's hostnames together.
+ *
+ * A batch is the unit the server can settle a site inside, so the names are grouped by site first and a site that
+ * would straddle a boundary starts the next batch instead of being cut in two.
+ *
+ * A site with more names than one batch holds has to be cut - `naukri.com` alone brings 182 names to a 1040-name
+ * list - and then only its first piece goes out with everybody else. The rest are left until the end of the run,
+ * where the address that site settled on is already known and goes out pinned with them, rather than racing the
+ * first piece and settling on a second address of their own.
+ */
+function familyBatches(names: readonly string[], size: number): string[][] {
+  const sites = new Map<string, string[]>();
+  for (const name of names) {
+    const family = hostFamily(name);
+    const group = sites.get(family);
+    if (group) group.push(name);
+    else sites.set(family, [name]);
+  }
+
+  const batches: string[][] = [];
+  const spilled: string[][] = [];
+  let current: string[] = [];
+  for (const group of sites.values()) {
+    if (group.length > size) {
+      const pieces = chunk(group, size);
+      batches.push(pieces[0]);
+      spilled.push(...pieces.slice(1));
+      continue;
+    }
+    if (current.length > 0 && current.length + group.length > size) {
+      batches.push(current);
+      current = [];
+    }
+    current.push(...group);
+  }
+  if (current.length > 0) batches.push(current);
+  return [...batches, ...spilled];
 }
 
 /**
@@ -210,12 +253,12 @@ export function HostsBuilder() {
   const { t } = useLocale();
   const headingId = useId();
   const baseGroup = useId();
-  const modeGroup = useId();
   const listId = useId();
   const urlId = useId();
   const urlErrorId = useId();
   const fileId = useId();
-  const { runChecks } = useDonorChecks();
+  const { check, runChecks, statusOf } = useDonorChecks();
+  const { donors: kept } = useCustomDonors();
 
   const [baseKind, setBaseKind] = useState<BaseKind>("list");
   const [sourceKey, setSourceKey] = useState<HostsSourceKey>(DEFAULT_HOSTS_SOURCE);
@@ -223,8 +266,14 @@ export function HostsBuilder() {
   const [urlInvalid, setUrlInvalid] = useState(false);
   const [base, setBase] = useState<Base | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>("auto");
-  const [donor, setDonor] = useState(DEFAULT_DNS_DONOR);
+  /**
+   * Which proxies the user has decided about, against the default of every one that answers.
+   *
+   * Held as the decisions themselves rather than as the resulting set, because the default moves: a proxy that
+   * was silent when the page opened and answers on the next check joins the run on its own, while one the user
+   * has ticked or unticked stays where they put it.
+   */
+  const [picks, setPicks] = useState<Record<string, boolean>>({});
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress>(NO_PROGRESS);
   const [donorCounts, setDonorCounts] = useState<readonly (readonly [string, number])[]>([]);
@@ -239,6 +288,30 @@ export function HostsBuilder() {
 
   const runRef = useRef<AbortController | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  /** The round of checks already under way, so starting a run waits for it instead of asking everyone again. */
+  const checksRef = useRef<Promise<CheckedDonor[]> | null>(null);
+
+  const listed = [...DNS_DONORS, ...kept];
+  const extra = kept.map((donor) => donor.value).join(" ");
+  const chosen = (value: string) => picks[value] ?? statusOf(value).dnsMs !== null;
+  const atCap = listed.filter((donor) => chosen(donor.value)).length >= MAX_DONORS;
+
+  // Checked as the panel opens, not when a run starts: the list below shows who answers, and everyone who does is
+  // in the run by default, so the answer has to be on screen before the user decides anything.
+  useEffect(() => {
+    checksRef.current = runChecks();
+  }, [runChecks]);
+
+  // The proxies added to this container arrive a moment later, and are folded into the same promise so that
+  // starting a run waits for them too.
+  useEffect(() => {
+    if (!extra) return;
+    const added = check(extra.split(" "));
+    const started = checksRef.current;
+    checksRef.current = started
+      ? Promise.all([started, added]).then(([presets, rest]) => [...presets, ...rest])
+      : added;
+  }, [check, extra]);
 
   /** Only one offered file at a time: the previous object URL is released as soon as it is replaced. */
   const offer = useCallback((text: string | null) => {
@@ -327,24 +400,33 @@ export function HostsBuilder() {
   }
 
   /**
-   * The order the run starts from: the server walks the donors in the given order for every hostname, so a dead
-   * donor in front would cost its DNS timeout on each of a thousand domains. Latency is all there is to go on
-   * before the first results; from then on `byCoverage` reorders by what the donors actually resolved.
+   * The proxies this run will use, fastest first.
+   *
+   * Which ones is the user's choice, but the default - everyone that answers - is only known once the checks are
+   * in, so the run waits for the round already under way rather than asking everyone a second time. A proxy the
+   * user ticked by hand is kept even if it was silent, and goes last, because they asked for it.
+   *
+   * The order matters: the server walks the proxies in the order it is given for every hostname, so a silent one
+   * in front would cost its DNS timeout on each of a thousand domains. From there `byCoverage` reorders by what
+   * they actually resolved.
    */
   async function rankDonors(signal: AbortSignal): Promise<string[]> {
     // The checks report themselves when they are all in, so there is nothing to poll and no ceiling to truncate a
     // slow network at; cancelling the run still answers at once, because the cancel is raced against them.
-    const checked = await Promise.race([runChecks(), cancellation(signal)]);
-    return checked
-      .filter(({ check }) => check.dnsMs !== null)
-      .sort((a, b) => (a.check.dnsMs ?? 0) - (b.check.dnsMs ?? 0))
-      .slice(0, MAX_DONORS)
-      .map(({ donor }) => donor);
+    const started = checksRef.current ?? runChecks(extra ? extra.split(" ") : []);
+    const checked: CheckedDonor[] = await Promise.race([started, cancellation(signal)]);
+    const latency = new Map(checked.map(({ donor, check }) => [donor, check.dnsMs]));
+    return listed
+      .map(({ value }) => value)
+      .filter((value) => picks[value] ?? (latency.get(value) !== null && latency.get(value) !== undefined))
+      .sort((a, b) => (latency.get(a) ?? Number.POSITIVE_INFINITY) - (latency.get(b) ?? Number.POSITIVE_INFINITY))
+      .slice(0, MAX_DONORS);
   }
 
   async function resolveBatch(
     hostnames: string[],
     donors: readonly string[],
+    pinned: Record<string, string>,
     signal: AbortSignal
   ): Promise<Resolved[]> {
     const missed = (): Resolved[] => hostnames.map((hostname) => ({ hostname, ip: null, ms: null, donor: null }));
@@ -354,7 +436,7 @@ export function HostsBuilder() {
         response = await fetch("/api/hosts/resolve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ donors, hostnames }),
+          body: JSON.stringify({ donors, hostnames, pinned }),
           signal
         });
       } catch (reason) {
@@ -384,21 +466,19 @@ export function HostsBuilder() {
     const unresolvable = base.summary.unresolvableHostnames;
     setProgress({ total: names.length + unresolvable, done: unresolvable, resolved: 0, kept: unresolvable });
 
-    let donors = [donor];
-    if (mode === "auto") {
-      setPhase("ranking");
-      try {
-        donors = await rankDonors(controller.signal);
-      } catch {
-        setCancelled(true);
-        setPhase("ready");
-        return;
-      }
-      if (donors.length === 0) {
-        setNoDonors(true);
-        setPhase("ready");
-        return;
-      }
+    let donors: string[];
+    setPhase("ranking");
+    try {
+      donors = await rankDonors(controller.signal);
+    } catch {
+      setCancelled(true);
+      setPhase("ready");
+      return;
+    }
+    if (donors.length === 0) {
+      setNoDonors(true);
+      setPhase("ready");
+      return;
     }
 
     setPhase("resolving");
@@ -411,6 +491,10 @@ export function HostsBuilder() {
     // Every hostname still without an address, against the donors it has already been walked through. The sweep
     // reads it to ask each one the donors it is still owed, and a hostname leaves it the moment one answers.
     const outstanding = new Map<string, readonly string[]>();
+    // The address each site has been settled on, with the donor that supplied it. The server settles a site
+    // within one batch; this carries that decision to the later batches a large site spills into, and to the
+    // sweep, so one site still ends the run behind one proxy.
+    const sites = new Map<string, { ip: string; donor: string }>();
 
     /**
      * Charges one hostname's attempts. The server walks the donors in the order it was sent and stops at the first
@@ -444,23 +528,42 @@ export function HostsBuilder() {
           // the batches that have already answered taught is in the tally by now, so the workers sharing the cursor
           // always dispatch with the current narrowed pair, and a change of pair reaches every later batch.
           const order = job.donors ?? donorsForBatch(index);
-          const results = await resolveBatch(job.hostnames, order, controller.signal);
+          // Read at dispatch, like the donors, so a batch carries whatever the batches before it settled on.
+          const pinned: Record<string, string> = {};
+          for (const hostname of job.hostnames) {
+            const family = hostFamily(hostname);
+            const site = sites.get(family);
+            if (site) pinned[family] = site.ip;
+          }
+          const results = await resolveBatch(job.hostnames, order, pinned, controller.signal);
           // Recorded before the rows are read, so a hostname the server left out of its answer is still owed the
           // rest of the walk rather than quietly dropped from the sweep.
           for (const hostname of job.hostnames) {
             const walked = outstanding.get(hostname);
             outstanding.set(hostname, walked ? [...new Set([...walked, ...order])] : [...order]);
           }
+          // The rows that name a donor are read first. A row that took its site's address names none, because
+          // nobody was asked for it, and it is credited to the donor that supplied that address - which is what
+          // this pass records, whichever order the server answered the names in.
+          for (const row of results) {
+            if (typeof row?.hostname !== "string" || typeof row.ip !== "string" || !row.donor) continue;
+            const family = hostFamily(row.hostname);
+            if (!sites.has(family)) sites.set(family, { ip: row.ip, donor: row.donor });
+          }
           let resolved = 0;
           for (const row of results) {
             if (typeof row?.hostname !== "string") continue;
-            if (typeof row.ip === "string") {
-              overrides.set(row.hostname, row.ip);
-              outstanding.delete(row.hostname);
-              resolved += 1;
-              if (row.donor) answered.set(row.donor, (answered.get(row.donor) ?? 0) + 1);
+            if (typeof row.ip !== "string") {
+              charge(order, null);
+              continue;
             }
-            charge(order, typeof row.ip === "string" ? row.donor : null);
+            overrides.set(row.hostname, row.ip);
+            outstanding.delete(row.hostname);
+            resolved += 1;
+            const credited = row.donor ?? sites.get(hostFamily(row.hostname))?.donor ?? null;
+            if (credited) answered.set(credited, (answered.get(credited) ?? 0) + 1);
+            // A name that took its site's address cost no donor a lookup, so no donor is charged for it.
+            if (row.donor) charge(order, row.donor);
           }
           // A sweep re-asks hostnames the main pass already counted, so it moves them from kept to resolved
           // instead of adding to `done`: `resolved + kept` stays equal to `done`, and neither of them ever drops.
@@ -498,12 +601,16 @@ export function HostsBuilder() {
         groups.set(key, group);
       }
       return [...groups.values()].flatMap((group) =>
-        chunk(group.hostnames, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: group.donors, fresh: false }))
+        familyBatches(group.hostnames, BATCH_SIZE).map((hostnames) => ({
+          hostnames,
+          donors: group.donors,
+          fresh: false
+        }))
       );
     };
 
     try {
-      const main = chunk(names, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: null, fresh: true }));
+      const main = familyBatches(names, BATCH_SIZE).map((hostnames) => ({ hostnames, donors: null, fresh: true }));
       await pump(main, MAX_IN_FLIGHT);
       const sweep = sweepJobs();
       if (sweep.length > 0) {
@@ -730,19 +837,40 @@ export function HostsBuilder() {
       ) : null}
 
       <fieldset className="mt-4 border-t border-line pt-3">
-        <legend className="text-xs font-medium text-ink/70">{t("hosts.mode.legend")}</legend>
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <legend className="text-xs font-medium text-ink/70">
           <span className="inline-flex items-center gap-1">
-            <Radio name={modeGroup} checked={mode === "auto"} onSelect={() => setMode("auto")}>
-              {t("hosts.mode.auto")}
-            </Radio>
-            <Tooltip text={t("hosts.mode.autoHint")} className="size-3" />
+            {t("hosts.mode.legend")}
+            <Tooltip text={t("hosts.mode.hint")} className="size-3" />
           </span>
-          <Radio name={modeGroup} checked={mode === "specific"} onSelect={() => setMode("specific")}>
-            {t("hosts.mode.specific")}
-          </Radio>
-          {mode === "specific" ? <DonorSelect value={donor} onChange={setDonor} label={t("profiles.donor")} /> : null}
-        </div>
+        </legend>
+        <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+          {listed.map(({ label, value }) => {
+            const status = statusOf(value);
+            const on = chosen(value);
+            return (
+              <li key={value}>
+                <label className="inline-flex items-center gap-1.5 text-xs text-ink/70">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    // Past the route's ceiling the only thing left to offer is a swap, so the rest stop taking ticks.
+                    disabled={!on && atCap}
+                    onChange={(event) => setPicks((current) => ({ ...current, [value]: event.target.checked }))}
+                    className="size-3.5 accent-moss"
+                  />
+                  {label}
+                  <span className="text-[11px] tabular-nums text-ink/40">
+                    {status.dns === "checking"
+                      ? t("hosts.donors.checking")
+                      : status.dnsMs !== null
+                        ? t("profiles.donorCheckMs", { ms: status.dnsMs })
+                        : t("hosts.donors.silent")}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
       </fieldset>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
@@ -809,7 +937,7 @@ export function HostsBuilder() {
             {donorCounts.map(([value, count]) => (
               <tr key={value} className="border-t border-line">
                 <th scope="row" className="py-1 text-left font-normal text-ink">
-                  {getDnsDonorLabel(value) ?? value}
+                  {listed.find((donor) => donor.value === value)?.label ?? value}
                 </th>
                 <td className="py-1 text-right tabular-nums text-ink/70">{count}</td>
               </tr>

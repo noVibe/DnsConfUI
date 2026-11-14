@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
 import { DnsMonitor } from "./dns-monitor";
 
 const checkDonor = vi.hoisted(() => vi.fn());
@@ -12,7 +13,9 @@ vi.mock("@/lib/dns/donor-check", () => ({ checkDonor, visitorCountry }));
 function renderMonitor() {
   render(
     <LocaleProvider>
-      <DnsMonitor />
+      <CustomDonorsProvider>
+        <DnsMonitor />
+      </CustomDonorsProvider>
     </LocaleProvider>
   );
 }
@@ -23,6 +26,85 @@ describe("DnsMonitor", () => {
     checkDonor.mockResolvedValue({ dnsMs: 90, chatgptMs: 300, country: "NL", direct: false });
     visitorCountry.mockReset();
     visitorCountry.mockResolvedValue("UZ");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("offers to keep a DoH that answers and lists it under the name it is given", async () => {
+    const kept: { label: string; value: string }[] = [];
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        const { url, label } = JSON.parse(String(init.body)) as { url: string; label: string };
+        kept.push({ label, value: url });
+      }
+      return { ok: true, status: 200, json: async () => ({ donors: kept }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderMonitor();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Проверить свой DoH" }), {
+      target: { value: "https://dns.example.net/dns-query" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить" }));
+
+    // The offer waits for the check: there is no point keeping a server that does not answer.
+    expect(await screen.findByText("Отвечает. Оставить его в списке?")).toBeInTheDocument();
+    const name = screen.getByRole("textbox", { name: "Название для списка" });
+    expect(name).toHaveValue("dns.example.net");
+    fireEvent.change(name, { target: { value: "Мой DoH" } });
+    fireEvent.click(screen.getByRole("button", { name: "Оставить" }));
+
+    // It leaves the "custom" line and joins the table proper, under its own name.
+    expect(await screen.findByRole("row", { name: /Мой DoH/ })).toBeInTheDocument();
+    expect(screen.queryByText("Отвечает. Оставить его в списке?")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/donors/custom", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("takes a kept DoH back out of the table", async () => {
+    const kept: { label: string; value: string }[] = [];
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { url: string; label?: string }) : null;
+      if (init?.method === "POST" && body) kept.push({ label: body.label ?? "", value: body.url });
+      if (init?.method === "DELETE" && body) {
+        const index = kept.findIndex((donor) => donor.value === body.url);
+        if (index >= 0) kept.splice(index, 1);
+      }
+      return { ok: true, status: 200, json: async () => ({ donors: kept }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderMonitor();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Проверить свой DoH" }), {
+      target: { value: "https://dns.example.net/dns-query" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить" }));
+    await screen.findByText("Отвечает. Оставить его в списке?");
+    fireEvent.change(screen.getByRole("textbox", { name: "Название для списка" }), { target: { value: "Мой DoH" } });
+    fireEvent.click(screen.getByRole("button", { name: "Оставить" }));
+    await screen.findByRole("row", { name: /Мой DoH/ });
+
+    fireEvent.click(screen.getByRole("button", { name: "Удалить Мой DoH из таблицы" }));
+
+    await waitFor(() => expect(screen.queryByRole("row", { name: /Мой DoH/ })).not.toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith("/api/donors/custom", expect.objectContaining({ method: "DELETE" }));
+    // A preset has no such button: nothing on this page could put it back.
+    expect(screen.queryByRole("button", { name: /Comss/ })).not.toBeInTheDocument();
+  });
+
+  it("does not offer to keep a DoH that fails", async () => {
+    checkDonor.mockResolvedValue({ dnsMs: null, chatgptMs: null, country: null, direct: false });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ donors: [] }) } as Response)));
+    renderMonitor();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Проверить свой DoH" }), {
+      target: { value: "https://dns.example.net/dns-query" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить" }));
+
+    await screen.findByText("свой");
+    expect(screen.queryByText("Отвечает. Оставить его в списке?")).not.toBeInTheDocument();
   });
 
   it.each([

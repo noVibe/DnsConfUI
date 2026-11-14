@@ -1,4 +1,7 @@
-export const DNS_DONORS: readonly { label: string; value: string; site?: string }[] = [
+/** A DNS proxy the app can offer: the presets below, and the ones a user adds while the container runs. */
+export type DnsDonor = { readonly label: string; readonly value: string; readonly site?: string };
+
+export const DNS_DONORS: readonly DnsDonor[] = [
   { label: "GeoHide RU", value: "https://geohide.ru/dns-query", site: "https://geohide.ru" },
   { label: "GeoHide EU", value: "https://eu.geohide.ru/dns-query", site: "https://geohide.ru" },
   { label: "GeoHide US", value: "https://us.geohide.ru/dns-query", site: "https://geohide.ru" },

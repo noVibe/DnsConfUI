@@ -4,6 +4,7 @@ import { ChevronDown, Globe, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Pl
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { DnsMonitor } from "@/components/dns-monitor";
 import { HostsBuilder } from "@/components/hosts-builder";
+import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
 import { SetupWizard } from "@/components/setup-wizard";
 import { useAuth } from "@/components/auth-provider";
 import { useLocale } from "@/lib/i18n/context";
@@ -82,8 +83,11 @@ export default function Home() {
           </div>
         ) : (
           <>
-            <DnsMonitor />
-            <HostsBuilder />
+            {/* One list of added proxies for both: adding one in the monitor is what offers it to the builder. */}
+            <CustomDonorsProvider>
+              <DnsMonitor />
+              <HostsBuilder />
+            </CustomDonorsProvider>
 
             <details className="rounded-lg border border-line bg-white/80 p-4 shadow-sm">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-ink">

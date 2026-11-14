@@ -6,6 +6,7 @@ import { DNS_DONORS, isDnsDonorPreset } from "@/domain/dns-donors";
 import { useLocale } from "@/lib/i18n/context";
 import { cn } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useCustomDonors } from "@/components/wizard/custom-donors";
 import { ChatgptCheck, DnsCheck, useDonorChecks } from "@/components/wizard/donor-checks";
 
 const BUTTON_CLASS = "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60";
@@ -23,18 +24,30 @@ export function DnsMonitor() {
   const headingId = useId();
   const inputId = useId();
   const errorId = useId();
+  const nameId = useId();
   const { check, runChecks, statusOf } = useDonorChecks();
+  const { donors: kept, add, remove } = useCustomDonors();
   const [custom, setCustom] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [invalid, setInvalid] = useState(false);
-  const statuses = DNS_DONORS.map((donor) => ({ donor, status: statusOf(donor.value) }));
+  const [name, setName] = useState("");
+  const [addFailed, setAddFailed] = useState(false);
+  const listed = [...DNS_DONORS, ...kept];
+  const statuses = listed.map((donor) => ({ donor, status: statusOf(donor.value) }));
   const customStatus = custom ? statusOf(custom) : null;
   const checking = [...statuses.map(({ status }) => status), ...(customStatus ? [customStatus] : [])]
     .some((status) => status.chatgpt === "checking");
+  const extra = kept.map((donor) => donor.value).join(" ");
 
   useEffect(() => {
     void runChecks();
   }, [runChecks]);
+
+  // The added servers arrive from this container a moment later than the presets, and only they are checked then:
+  // the presets are already on their way, and `check` leaves a check that is still out alone.
+  useEffect(() => {
+    if (extra) void check(extra.split(" "));
+  }, [check, extra]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -43,9 +56,22 @@ export function DnsMonitor() {
     const value = /^[a-z][a-z\d+.-]*:\/\//i.test(typed) || !typed ? typed : `https://${typed}`;
     setInvalid(!isHttpsUrl(value));
     if (!isHttpsUrl(value)) return;
-    // A preset is already listed, so it is rechecked in place instead of being added twice.
-    setCustom(isDnsDonorPreset(value) ? null : value);
+    setAddFailed(false);
+    // A preset, or one already added, is listed already: it is rechecked in place instead of being added twice.
+    const known = isDnsDonorPreset(value) || kept.some((donor) => donor.value === value);
+    setCustom(known ? null : value);
+    if (!known) setName(new URL(value).host);
     check([value]);
+  }
+
+  async function keep() {
+    if (!custom) return;
+    const added = await add(custom, name.trim() || new URL(custom).host);
+    setAddFailed(!added);
+    if (!added) return;
+    // It is in the list proper now, under its own name, with the check it has just passed.
+    setCustom(null);
+    setInput("");
   }
 
   return (
@@ -55,7 +81,12 @@ export function DnsMonitor() {
           <h2 id={headingId} className="whitespace-nowrap text-base font-semibold text-ink">{t("monitor.title")}</h2>
           <Tooltip text={t("profiles.donorCheckTooltip")} />
         </div>
-        <button type="button" onClick={() => runChecks(custom ? [custom] : [])} disabled={checking} className={BUTTON_CLASS}>
+        <button
+          type="button"
+          onClick={() => runChecks([...kept.map((donor) => donor.value), ...(custom ? [custom] : [])])}
+          disabled={checking}
+          className={BUTTON_CLASS}
+        >
           <RefreshCw className={cn("size-3.5", checking && "animate-spin")} aria-hidden="true" />
           {t("monitor.refresh")}
         </button>
@@ -74,11 +105,24 @@ export function DnsMonitor() {
             {statuses.map(({ donor, status }) => (
               <tr key={donor.value} className="border-t border-line">
                 <th scope="row" className="whitespace-nowrap py-1.5 pr-2 text-left font-normal sm:pr-4">
-                  {donor.site ? (
-                    <a href={donor.site} target="_blank" rel="noreferrer" className="text-ink underline decoration-ink/25 underline-offset-2 transition-colors hover:text-steel hover:decoration-steel">
-                      {donor.label}
-                    </a>
-                  ) : donor.label}
+                  <span className="flex items-center gap-1.5">
+                    {donor.site ? (
+                      <a href={donor.site} target="_blank" rel="noreferrer" className="text-ink underline decoration-ink/25 underline-offset-2 transition-colors hover:text-steel hover:decoration-steel">
+                        {donor.label}
+                      </a>
+                    ) : donor.label}
+                    {/* Only the added ones can go: a preset is part of the app, and nothing here would bring it back. */}
+                    {isDnsDonorPreset(donor.value) ? null : (
+                      <button
+                        type="button"
+                        onClick={() => void remove(donor.value)}
+                        aria-label={t("monitor.custom.forget", { label: donor.label })}
+                        className="rounded text-ink/40 transition-colors hover:text-coral"
+                      >
+                        <X className="size-3.5" aria-hidden="true" />
+                      </button>
+                    )}
+                  </span>
                 </th>
                 <td className="whitespace-nowrap py-1.5 pr-2 sm:pr-4"><DnsCheck status={status} /></td>
                 <td className="whitespace-nowrap border-l border-line py-1.5 pl-2 pr-2 sm:pl-4 sm:pr-3"><ChatgptCheck status={status} /></td>
@@ -130,6 +174,27 @@ export function DnsMonitor() {
         </div>
         {invalid ? <p id={errorId} className="mt-1.5 text-xs text-coral">{t("monitor.custom.invalid")}</p> : null}
       </form>
+
+      {/* A server that answers is worth keeping in the table, and worth offering to the file builder. */}
+      {custom && customStatus?.dns === "ok" ? (
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="text-xs text-ink/70">{t("monitor.custom.worksTitle")}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <label htmlFor={nameId} className="sr-only">{t("monitor.custom.nameLabel")}</label>
+            <input
+              id={nameId}
+              value={name}
+              onChange={(event) => { setName(event.target.value); setAddFailed(false); }}
+              maxLength={24}
+              placeholder={t("monitor.custom.nameLabel")}
+              className="h-8 w-40 min-w-0 rounded-md border border-line bg-white px-2 text-xs text-ink outline-none placeholder:text-ink/35 focus:border-steel focus:ring-2 focus:ring-steel/20"
+            />
+            <button type="button" onClick={keep} className={BUTTON_CLASS}>{t("monitor.custom.add")}</button>
+          </div>
+          <p className="mt-1.5 text-xs text-ink/50">{t("monitor.custom.addHint")}</p>
+          {addFailed ? <p className="mt-1.5 text-xs text-coral">{t("monitor.custom.addFailed")}</p> : null}
+        </div>
+      ) : null}
     </section>
   );
 }

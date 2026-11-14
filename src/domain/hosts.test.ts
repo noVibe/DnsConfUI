@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyOverrides,
+  hostFamily,
   isPlausibleHostname,
   isResolvableHostname,
   overridableHostnames,
@@ -176,6 +177,47 @@ describe("isResolvableHostname", () => {
   it("stays a separate question from isPlausibleHostname: a single label is a legal entry", () => {
     expect(isPlausibleHostname("localhost")).toBe(true);
     expect(isResolvableHostname("localhost")).toBe(false);
+  });
+});
+
+describe("hostFamily", () => {
+  it("puts a site's own name and its subdomains in one family", () => {
+    expect(["example.com", "www.example.com", "api.example.com", "a.b.example.com"].map(hostFamily)).toEqual([
+      "example.com",
+      "example.com",
+      "example.com",
+      "example.com"
+    ]);
+  });
+
+  it("keeps separate sites apart", () => {
+    expect(hostFamily("example.com")).not.toBe(hostFamily("example.org"));
+    expect(hostFamily("www.example.com")).not.toBe(hostFamily("www.counterexample.com"));
+  });
+
+  it("reads a label of a country's naming scheme as part of the suffix", () => {
+    // Measured on the published lists: game8.co.jp, makita.com.au, powertoolsuk.co.uk and uainvest.com.ua all
+    // appear there, and the naive answer would file every .co.uk site in the land under one family.
+    expect(hostFamily("www.game8.co.jp")).toBe("game8.co.jp");
+    expect(hostFamily("makita.com.au")).toBe("makita.com.au");
+    expect(hostFamily("www.powertoolsuk.co.uk")).toBe("powertoolsuk.co.uk");
+    expect(hostFamily("shop.uainvest.com.ua")).toBe("uainvest.com.ua");
+  });
+
+  it("does not mistake a site whose own suffix is two letters", () => {
+    // `scdn.co` is Spotify's, so `accounts.scdn.co` belongs with it and not with every other .co name.
+    expect(hostFamily("accounts.scdn.co")).toBe("scdn.co");
+    expect(hostFamily("www.game8.jp")).toBe("game8.jp");
+    expect(hostFamily("cursor.sh")).toBe("cursor.sh");
+  });
+
+  it("answers for a name of two labels or fewer with the name itself", () => {
+    expect(hostFamily("example.com")).toBe("example.com");
+    expect(hostFamily("localhost")).toBe("localhost");
+  });
+
+  it("ignores case and a trailing dot", () => {
+    expect(hostFamily("WWW.Example.COM.")).toBe("example.com");
   });
 });
 

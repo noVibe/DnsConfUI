@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DNS_DONORS } from "@/domain/dns-donors";
 import { applyOverrides, parseHosts } from "@/domain/hosts";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { CustomDonorsProvider } from "@/components/wizard/custom-donors";
 import { HostsBuilder } from "./hosts-builder";
 
 const donorChecks = vi.hoisted(() => ({ checkDonor: vi.fn(), visitorCountry: vi.fn() }));
@@ -39,6 +40,22 @@ const BASE_WITH_OTHER =
     "5.5.5.5 not a_hostname!"
   ].join(CRLF) + CRLF;
 
+/** Two sites with their names interleaved, the way a published list carries them. */
+function twoSites(each: number): string {
+  const lines: string[] = [];
+  for (let index = 0; index < each; index++) {
+    lines.push(`1.1.1.1 n${index}.alpha.example`, `1.1.1.1 n${index}.beta.example`);
+  }
+  return lines.join(CRLF) + CRLF;
+}
+
+/** One site with more names than a batch holds, followed by a handful of sites with one name each. */
+function bigSite(size: number, others: number): string {
+  const lines = Array.from({ length: size }, (_, index) => `1.1.1.1 n${index}.big.example`);
+  for (let index = 0; index < others; index++) lines.push(`1.1.1.1 www.other${index}.example`);
+  return lines.join(CRLF) + CRLF;
+}
+
 function manyHosts(count: number): string {
   return Array.from({ length: count }, (_, index) => `9.9.9.9 h${index}.example`).join(CRLF) + CRLF;
 }
@@ -70,7 +87,11 @@ type Batch = { donors: string[]; hostnames: string[]; answer: (by: Answer) => vo
  * run starts from and the one the coverage ranking has to move away from.
  */
 const DNS_MS: readonly (number | null)[] = [null, 300, 50, null, 120, 90, 200, 400, 410, 420, 430];
-const FASTEST = [DNS_DONORS[2].value, DNS_DONORS[5].value, DNS_DONORS[4].value, DNS_DONORS[6].value];
+/** Every preset that answers under `DNS_MS`, fastest first: what a run uses when the user leaves the list alone. */
+const FASTEST = DNS_DONORS.map((donor, index) => ({ donor: donor.value, ms: DNS_MS[index] }))
+  .filter(({ ms }) => ms !== null)
+  .sort((a, b) => (a.ms ?? 0) - (b.ms ?? 0))
+  .map(({ donor }) => donor);
 
 /** Answers every hostname in the batch with the given donor, whatever place the component gave it in the walk. */
 function answeredBy(donor: string, body: { hostnames: string[] }): Response {
@@ -108,6 +129,8 @@ function withLatencies() {
 function heldBatches(): Batch[] {
   const pending: Batch[] = [];
   fetchMock.mockImplementation((url: string, init: RequestInit) => {
+    // Only the batches are held: the list of proxies this container has been given answers at once, as it does.
+    if (url === "/api/donors/custom") return Promise.resolve(jsonResponse({ donors: [] }));
     const body = JSON.parse(String(init.body)) as { donors: string[]; hostnames: string[] };
     return new Promise<Response>((resolve, reject) => {
       init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
@@ -136,7 +159,9 @@ function heldBatches(): Batch[] {
 function renderBuilder() {
   render(
     <LocaleProvider>
-      <HostsBuilder />
+      <CustomDonorsProvider>
+        <HostsBuilder />
+      </CustomDonorsProvider>
     </LocaleProvider>
   );
 }
@@ -174,6 +199,7 @@ describe("HostsBuilder", () => {
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
       const body = init.body ? JSON.parse(String(init.body)) : {};
+      if (url === "/api/donors/custom") return jsonResponse({ donors: [] });
       if (url === "/api/hosts/source") return jsonResponse({ text: BASE, url: "https://geohide.ru/hosts" });
       if (url === "/api/hosts/resolve") return resolveResponse(body);
       throw new Error(`unexpected request to ${url}`);
@@ -244,7 +270,7 @@ describe("HostsBuilder", () => {
     expect(await screen.findByText("Введите HTTPS-адрес вида https://example.com/hosts")).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(input).toHaveAccessibleDescription("Введите HTTPS-адрес вида https://example.com/hosts");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(callsTo("/api/hosts/source")).toEqual([]);
   });
 
   it("never calls the server for a file from the user's computer", async () => {
@@ -252,19 +278,23 @@ describe("HostsBuilder", () => {
 
     await uploadBase();
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(callsTo("/api/hosts/source")).toEqual([]);
     expect(screen.getByText("Перенаправление: 4")).toBeInTheDocument();
     // A file of the user's own has no address to link to, so its name stands in the heading instead.
     expect(screen.queryByRole("link", { name: "источник" })).not.toBeInTheDocument();
   });
 
-  it("sends exactly the donor chosen in manual mode", async () => {
+  it("sends exactly the proxies left ticked", async () => {
     renderBuilder();
     await uploadBase();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Использовать выбранный" }));
-    fireEvent.click(screen.getByRole("combobox", { name: "DNS-донор" }));
-    fireEvent.click(await screen.findByRole("option", { name: /^Comss\./ }));
+    // Every proxy that answers starts ticked, so choosing one means taking the others out.
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Comss/ })).toBeChecked());
+    for (const donor of DNS_DONORS) {
+      if (donor.label === "Comss") continue;
+      const box = screen.getByRole("checkbox", { name: new RegExp(`^${donor.label}`) });
+      if ((box as HTMLInputElement).checked) fireEvent.click(box);
+    }
     start();
 
     await screen.findByRole("link", { name: "Скачать файл hosts" });
@@ -374,9 +404,9 @@ describe("HostsBuilder", () => {
     pending[2].answer(null);
 
     await waitFor(() => expect(pending).toHaveLength(4));
-    // Exactly the two donors the narrowed pass did not ask, so these twenty end the run having been put to all
-    // four once — the same total they paid when every batch carried the whole list.
-    expect(pending[3].donors).toEqual([FASTEST[0], FASTEST[1]]);
+    // Exactly the donors the narrowed pass did not ask, so these twenty end the run having been put to every one
+    // of them once — the same total they paid when every batch carried the whole list.
+    expect([...pending[3].donors].sort()).toEqual(FASTEST.filter((donor) => !pending[2].donors.includes(donor)).sort());
     expect(pending[3].hostnames).toEqual(pending[2].hostnames);
     expect(screen.getByRole("status")).toHaveTextContent(
       "Добираем оставшимися прокси домены, которые ещё без адреса…"
@@ -516,6 +546,7 @@ describe("HostsBuilder", () => {
   it("splits the domains into batches of fifty and keeps at most two of them in flight", async () => {
     const pending: { hostnames: string[]; respond: () => void }[] = [];
     fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url === "/api/donors/custom") return Promise.resolve(jsonResponse({ donors: [] }));
       const body = JSON.parse(String(init.body));
       return new Promise<Response>((resolve) => {
         pending.push({ hostnames: body.hostnames, respond: () => resolve(resolveResponse(body)) });
@@ -542,6 +573,7 @@ describe("HostsBuilder", () => {
   it("advances the progress counts as batches come back", async () => {
     const pending: { respond: () => void }[] = [];
     fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url === "/api/donors/custom") return Promise.resolve(jsonResponse({ donors: [] }));
       const body = JSON.parse(String(init.body));
       return new Promise<Response>((resolve) => {
         pending.push({ respond: () => resolve(resolveResponse(body)) });
@@ -672,6 +704,63 @@ describe("HostsBuilder", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Готово: 2 из 3 доменов получили рабочий адрес, 1 оставили прежний."
     );
+  });
+
+  it("keeps a site's hostnames in one batch instead of cutting them at fifty", async () => {
+    renderBuilder();
+    await uploadBase(twoSites(30), "sites");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+
+    // Sixty names could have gone out as fifty and ten; they go out as two whole sites instead, because only a
+    // batch that holds the whole site can settle it on one address.
+    const batches = callsTo("/api/hosts/resolve").map((body) => body.hostnames as string[]);
+    expect(batches.map((names) => names.length)).toEqual([30, 30]);
+    expect(batches[0].every((name) => name.endsWith(".alpha.example"))).toBe(true);
+    expect(batches[1].every((name) => name.endsWith(".beta.example"))).toBe(true);
+  });
+
+  it("pins the address a site settled on for the piece of it left until the end", async () => {
+    renderBuilder();
+    await uploadBase(bigSite(60, 20), "big");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+
+    const calls = callsTo("/api/hosts/resolve");
+    // The site's first fifty go out with everyone else, and its last ten wait for the end of the run.
+    expect(calls.map((body) => body.hostnames.length)).toEqual([50, 20, 10]);
+    expect(calls[0].pinned).toEqual({});
+    expect(calls[1].pinned).toEqual({});
+    expect(calls[2].pinned).toEqual({ "big.example": ipFor("n0.big.example") });
+  });
+
+  it("credits a hostname that took its site's address to the donor that supplied it", async () => {
+    const site = ["1.1.1.1 example.com", "1.1.1.1 www.example.com", "1.1.1.1 api.example.com"].join(CRLF) + CRLF;
+    // The server names a donor only for the name it actually asked about; the other two took that same address.
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { donors: string[]; hostnames: string[] };
+      return jsonResponse({
+        results: body.hostnames.map((hostname) => ({
+          hostname,
+          ip: "203.0.113.9",
+          ms: 70,
+          donor: hostname === "example.com" ? body.donors[0] : null
+        }))
+      });
+    });
+    renderBuilder();
+    await uploadBase(site, "site");
+
+    start();
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+
+    // All three are the donor's work, even though it was asked about one of them.
+    expect(screen.getByRole("row", { name: /GeoHide RU 3/ })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Готово: 3 из 3 доменов получили рабочий адрес");
+    const produced = (await blobs[0].text()).split(CRLF);
+    expect(produced.filter((line) => line.startsWith("203.0.113.9"))).toHaveLength(3);
   });
 
   it("leaves the blocking entries out of the file once the user unticks them", async () => {

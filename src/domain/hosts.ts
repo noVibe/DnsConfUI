@@ -155,6 +155,33 @@ export function isResolvableHostname(value: string): boolean {
   return labels.length >= 2 && labels.every((label) => HOSTNAME_LABEL.test(label));
 }
 
+/**
+ * Second-level labels that belong to a country's naming scheme rather than to a site, so that `game8.co.jp` is
+ * read as one site instead of the whole of `co.jp`.
+ *
+ * The exhaustive answer is the public suffix list: thousands of rules that change month to month, for a question
+ * this is not deciding. Getting one wrong here costs a preference and nothing else - a family only decides which
+ * address is *tried first* for a name, and every address is still checked against the name it will serve.
+ */
+const COUNTRY_SECOND_LEVEL: ReadonlySet<string> = new Set(["ac", "co", "com", "edu", "gov", "ne", "net", "or", "org"]);
+
+/**
+ * The site a hostname belongs to, as far as it can be told without the public suffix list.
+ *
+ * `example.com`, `www.example.com` and `api.example.com` all answer `example.com`, which is what lets a run put a
+ * site's subdomains behind one proxy address instead of scattering them over several. A two-letter suffix is a
+ * country's, so one of the labels above in front of it is part of the suffix too: `www.game8.co.jp` answers
+ * `game8.co.jp`. A name of two labels or fewer is its own family.
+ */
+export function hostFamily(hostname: string): string {
+  const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
+  if (labels.length <= 2) return labels.join(".");
+  const suffix = labels[labels.length - 1];
+  const second = labels[labels.length - 2];
+  const depth = suffix.length === 2 && COUNTRY_SECOND_LEVEL.has(second) ? 3 : 2;
+  return labels.slice(-depth).join(".");
+}
+
 /** A sink or loopback pin: meaningful as written, so never re-resolved. */
 export function isBlockingIp(value: string): boolean {
   if (BLOCKING_IPS.has(value)) return true;

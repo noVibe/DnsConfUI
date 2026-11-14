@@ -51,6 +51,8 @@ describe("POST /api/hosts/resolve", () => {
     { donors: [GEOHIDE], hostnames: [42] },
     { donors: [GEOHIDE], hostnames: [null] },
     { donors: [GEOHIDE], hostnames: [`${"a".repeat(254)}`] },
+    { donors: [GEOHIDE], hostnames: ["a.example"], pinned: { "a.example": "not-an-address" } },
+    { donors: [GEOHIDE], hostnames: ["a.example"], pinned: { "a.example": "2a00::1" } },
     "}{"
   ])("rejects %j", async (body) => {
     const response = await POST(resolveRequest(body));
@@ -218,6 +220,124 @@ describe("POST /api/hosts/resolve", () => {
 
     expect((await (await pending).json()).results).toHaveLength(25);
     expect(peak).toBe(10);
+  });
+
+  it("puts a site's subdomains on the address its own shortest name settled on", async () => {
+    dohMocks.resolveA.mockImplementation(async (_donor: string, hostname: string) =>
+      hostname === "example.com" ? ["203.0.113.9"] : ["198.51.100.7"]
+    );
+    probeMocks.probeHost.mockResolvedValue(authorized(40));
+
+    const hostnames = ["www.example.com", "api.example.com", "example.com"];
+
+    expect(await resolved({ donors: [GEOHIDE], hostnames })).toEqual([
+      { hostname: "www.example.com", ip: "203.0.113.9", ms: 40, donor: null },
+      { hostname: "api.example.com", ip: "203.0.113.9", ms: 40, donor: null },
+      { hostname: "example.com", ip: "203.0.113.9", ms: 40, donor: GEOHIDE }
+    ]);
+    // Nobody was asked about the subdomains at all: the site's address answered for them, which is also why they
+    // name no donor. Had each been resolved on its own they would have landed on a second proxy.
+    expect(dohMocks.resolveA.mock.calls.map(([, name]) => name)).toEqual(["example.com"]);
+  });
+
+  it("walks the donors for a subdomain the site's address does not serve", async () => {
+    dohMocks.resolveA.mockImplementation(async (_donor: string, hostname: string) =>
+      hostname === "example.com" ? ["203.0.113.9"] : ["198.51.100.7"]
+    );
+    probeMocks.probeHost.mockImplementation(async (ip: string, hostname: string) =>
+      ip === "203.0.113.9" && hostname !== "example.com" ? unauthorized() : authorized(80)
+    );
+
+    expect(await resolved({ donors: [GEOHIDE], hostnames: ["example.com", "shop.example.com"] })).toEqual([
+      { hostname: "example.com", ip: "203.0.113.9", ms: 80, donor: GEOHIDE },
+      { hostname: "shop.example.com", ip: "198.51.100.7", ms: 80, donor: GEOHIDE }
+    ]);
+  });
+
+  it("falls back to the second address the site answered on rather than resolving each name apart", async () => {
+    // Measured on spotify.com: its subdomains are not all fronted by the same proxy, so the apex address serves
+    // some of them and not others. The ones it refuses should still end up together.
+    dohMocks.resolveA.mockImplementation(async (_donor: string, hostname: string) =>
+      hostname === "example.com" ? ["203.0.113.9"] : [`198.51.100.${Number(hostname.match(/\d+/)?.[0] ?? 0) + 1}`]
+    );
+    probeMocks.probeHost.mockImplementation(async (ip: string, hostname: string) =>
+      ip === "203.0.113.9" && hostname !== "example.com" ? unauthorized() : authorized(45)
+    );
+
+    const siblings = Array.from({ length: 12 }, (_, index) => `n${index}.example.com`);
+    const results: { hostname: string; ip: string }[] = await resolved({
+      donors: [GEOHIDE],
+      hostnames: ["example.com", ...siblings]
+    });
+    const address = Object.fromEntries(results.map((row) => [row.hostname, row.ip]));
+
+    expect(address["example.com"]).toBe("203.0.113.9");
+    // Ten names start together, so each finds its own address before any of them has reported one. The names
+    // after them are handed what the first of those found, instead of adding an eleventh and twelfth address.
+    expect(address["n10.example.com"]).toBe(address["n0.example.com"]);
+    expect(address["n11.example.com"]).toBe(address["n0.example.com"]);
+    expect(dohMocks.resolveA.mock.calls.map(([, name]) => name)).not.toContain("n10.example.com");
+  });
+
+  it("keeps one site's address away from another site", async () => {
+    dohMocks.resolveA.mockImplementation(async (_donor: string, hostname: string) =>
+      hostname.endsWith("example.com") ? ["203.0.113.9"] : ["198.51.100.7"]
+    );
+    probeMocks.probeHost.mockResolvedValue(authorized(50));
+
+    const results = await resolved({
+      donors: [GEOHIDE],
+      hostnames: ["example.com", "www.example.com", "example.org", "www.example.org"]
+    });
+
+    expect(results.map((row: { ip: string }) => row.ip)).toEqual([
+      "203.0.113.9",
+      "203.0.113.9",
+      "198.51.100.7",
+      "198.51.100.7"
+    ]);
+    expect(dohMocks.resolveA.mock.calls.map(([, name]) => name).sort()).toEqual(["example.com", "example.org"]);
+  });
+
+  it("tries an address the caller pinned for the site before asking any resolver", async () => {
+    dohMocks.resolveA.mockResolvedValue(["198.51.100.7"]);
+    probeMocks.probeHost.mockResolvedValue(authorized(25));
+
+    const body = { donors: [GEOHIDE], hostnames: ["api.example.com"], pinned: { "example.com": "203.0.113.9" } };
+
+    expect(await resolved(body)).toEqual([
+      { hostname: "api.example.com", ip: "203.0.113.9", ms: 25, donor: null }
+    ]);
+    expect(dohMocks.resolveA).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the donors when the pinned address does not serve the hostname", async () => {
+    dohMocks.resolveA.mockResolvedValue(["198.51.100.7"]);
+    probeMocks.probeHost.mockImplementation(async (ip: string) =>
+      ip === "203.0.113.9" ? unauthorized() : authorized(60)
+    );
+
+    const body = { donors: [GEOHIDE], hostnames: ["api.example.com"], pinned: { "example.com": "203.0.113.9" } };
+
+    expect(await resolved(body)).toEqual([
+      { hostname: "api.example.com", ip: "198.51.100.7", ms: 60, donor: GEOHIDE }
+    ]);
+  });
+
+  it("ignores a pin for another site and a pin that is not a public address", async () => {
+    dohMocks.resolveA.mockResolvedValue(["198.51.100.7"]);
+    probeMocks.probeHost.mockResolvedValue(authorized(60));
+
+    const body = {
+      donors: [GEOHIDE],
+      hostnames: ["api.example.com", "api.other.com"],
+      pinned: { "example.com": "127.0.0.1", "elsewhere.com": "203.0.113.9" }
+    };
+
+    expect((await resolved(body)).map((row: { ip: string }) => row.ip)).toEqual(["198.51.100.7", "198.51.100.7"]);
+    // A loopback pin is never dialled, and a pin for a site not in the batch belongs to nobody in it.
+    expect(probeMocks.probeHost).not.toHaveBeenCalledWith("127.0.0.1", expect.anything(), expect.anything());
+    expect(probeMocks.probeHost).not.toHaveBeenCalledWith("203.0.113.9", expect.anything(), expect.anything());
   });
 
   it("shares one run between concurrent requests for the same batch", async () => {
