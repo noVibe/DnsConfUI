@@ -3,7 +3,8 @@ export const DNS_DONORS: readonly { label: string; value: string; site?: string 
   { label: "GeoHide EU", value: "https://eu.geohide.ru/dns-query", site: "https://geohide.ru" },
   { label: "GeoHide US", value: "https://us.geohide.ru/dns-query", site: "https://geohide.ru" },
   { label: "Comss", value: "https://dns.comss.one/dns-query", site: "https://www.comss.ru/page.php?id=7315" },
-  { label: "MagicDNS", value: "https://dns.magicdns.ru/dns-query", site: "https://magicdns.ru" },
+  // Its own site publishes this address: dns.magicdns.ru no longer resolves, and magicdns.ru is only the page.
+  { label: "MagicDNS", value: "https://api.magicinfo.art/rpc", site: "https://magicdns.ru" },
   { label: "Bezmezhau", value: "https://dns.bezmezhau.com/dns-query", site: "https://bezmezhau.com/en" },
   { label: "WLRUS", value: "https://dns.wlrus.cfd/dns-query", site: "https://site.dns.wlrus.cfd" },
   { label: "Malw", value: "https://dns.malw.link/dns-query", site: "https://info.dns.malw.link" },
