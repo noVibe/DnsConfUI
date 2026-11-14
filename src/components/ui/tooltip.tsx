@@ -91,7 +91,9 @@ export function Tooltip({ text, className, children }: { text: string; className
           // Fixed, so the box is placed against the window it has to stay inside rather than against whichever
           // ancestor happens to be positioned. It is kept hidden for the one frame it takes to measure it.
           style={{ left: at?.left ?? 0, top: at?.top ?? 0, visibility: at ? "visible" : "hidden" }}
-          className="fixed z-20 w-[min(16rem,calc(100vw-1rem))] whitespace-normal rounded-md border border-line bg-white px-3 py-2 text-xs font-normal text-ink/80 shadow-sm"
+          // `text-left` and `font-normal` for the same reason: the box reads the same wherever it is opened from,
+          // and this one hangs off a right-aligned column header, which would otherwise set its text ragged-left.
+          className="fixed z-20 w-[min(16rem,calc(100vw-1rem))] whitespace-normal rounded-md border border-line bg-white px-3 py-2 text-left text-xs font-normal text-ink/80 shadow-sm"
         >
           {text}
         </div>
