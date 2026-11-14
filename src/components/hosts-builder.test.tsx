@@ -113,12 +113,13 @@ function callsTo(url: string): any[] {
 /** Puts `DNS_MS` behind the donor checks, so the run starts in the `FASTEST` order. */
 function withLatencies() {
   const dnsMsOf = new Map(DNS_DONORS.map((donor, index) => [donor.value, DNS_MS[index]]));
-  donorChecks.checkDonor.mockImplementation(async (donor: string) => ({
-    dnsMs: dnsMsOf.get(donor) ?? null,
-    chatgptMs: 300,
-    country: "NL",
-    direct: false
-  }));
+  donorChecks.checkDonor.mockImplementation(async (donor: string) => {
+    // A donor whose DNS never answered has no ChatGPT time either, as the check route reports it.
+    const dnsMs = dnsMsOf.get(donor) ?? null;
+    return dnsMs === null
+      ? { dnsMs: null, chatgptMs: null, country: null, direct: false, reason: null }
+      : { dnsMs, chatgptMs: 300, country: "NL", direct: false, reason: null };
+  });
 }
 
 /**
@@ -299,6 +300,28 @@ describe("HostsBuilder", () => {
 
     await screen.findByRole("link", { name: "Скачать файл hosts" });
     expect(callsTo("/api/hosts/resolve").map((body) => body.donors)).toEqual([["https://dns.comss.one/dns-query"]]);
+  });
+
+  it("leaves a proxy unticked when the monitor could not reach ChatGPT through it", async () => {
+    const dead = DNS_DONORS[1];
+    donorChecks.checkDonor.mockImplementation(async (donor: string) =>
+      donor === dead.value
+        // Answers DNS, but its address does not serve chatgpt.com: asking it would cost every domain a lookup.
+        ? { dnsMs: 90, chatgptMs: null, country: null, direct: false, reason: "unreachable" }
+        : { dnsMs: 100, chatgptMs: 300, country: "NL", direct: false, reason: null }
+    );
+    renderBuilder();
+    await uploadBase();
+
+    const box = await screen.findByRole("checkbox", { name: new RegExp(`^${dead.label}`) });
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /^Comss/ })).toBeChecked());
+    expect(box).not.toBeChecked();
+    // The row says why rather than leaving an unticked box next to a healthy-looking DNS time.
+    expect(box.closest("label")).toHaveTextContent(`${dead.label}без ChatGPT`);
+
+    // It is a default, not a rule: the user can still put it in.
+    fireEvent.click(box);
+    expect(box).toBeChecked();
   });
 
   it("ranks the donors by measured latency before resolving and sends the best four, fastest first", async () => {

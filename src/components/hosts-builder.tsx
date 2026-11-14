@@ -293,7 +293,10 @@ export function HostsBuilder() {
 
   const listed = [...DNS_DONORS, ...kept];
   const extra = kept.map((donor) => donor.value).join(" ");
-  const chosen = (value: string) => picks[value] ?? statusOf(value).dnsMs !== null;
+  // Answering DNS is not the same as being usable here: a proxy whose address does not serve chatgpt.com will not
+  // serve the domains in the file either, and asking it costs every domain a failed lookup. So the ones ticked by
+  // default are the ones the monitor got ChatGPT through; any of them can still be ticked or unticked by hand.
+  const chosen = (value: string) => picks[value] ?? statusOf(value).chatgpt === "ok";
   const atCap = listed.filter((donor) => chosen(donor.value)).length >= MAX_DONORS;
 
   // Checked as the panel opens, not when a run starts: the list below shows who answers, and everyone who does is
@@ -860,11 +863,13 @@ export function HostsBuilder() {
                   />
                   {label}
                   <span className="text-[11px] tabular-nums text-ink/40">
-                    {status.dns === "checking"
+                    {status.chatgpt === "checking"
                       ? t("hosts.donors.checking")
-                      : status.dnsMs !== null
-                        ? t("profiles.donorCheckMs", { ms: status.dnsMs })
-                        : t("hosts.donors.silent")}
+                      : status.chatgptMs !== null
+                        ? t("profiles.donorCheckMs", { ms: status.chatgptMs })
+                        : status.dnsMs === null
+                          ? t("hosts.donors.silent")
+                          : t("hosts.donors.noChatgpt")}
                   </span>
                 </label>
               </li>
