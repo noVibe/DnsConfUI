@@ -336,6 +336,26 @@ describe("HostsBuilder", () => {
     expect(box()).not.toBeChecked();
   });
 
+  it("asks only the proxies that are ticked, whatever their DNS said", async () => {
+    const dead = DNS_DONORS[1];
+    donorChecks.checkDonor.mockImplementation(async (donor: string) =>
+      donor === dead.value
+        // Answers DNS quickly, which used to be enough to be asked, and reaches nothing.
+        ? { dnsMs: 10, chatgptMs: null, country: null, direct: false, reason: "unreachable" }
+        : { dnsMs: 100, chatgptMs: 300, country: "NL", direct: false, reason: null }
+    );
+    renderBuilder();
+    await uploadBase();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: new RegExp(`^${dead.label}`) })).not.toBeChecked());
+
+    start();
+
+    await screen.findByRole("link", { name: "Скачать файл hosts" });
+    const asked = callsTo("/api/hosts/resolve").flatMap((body) => body.donors);
+    expect(asked).not.toContain(dead.value);
+    expect(asked).toContain(DNS_DONORS[0].value);
+  });
+
   it("leaves a proxy unticked when the monitor could not reach ChatGPT through it", async () => {
     const dead = DNS_DONORS[1];
     donorChecks.checkDonor.mockImplementation(async (donor: string) =>
@@ -516,12 +536,11 @@ describe("HostsBuilder", () => {
   it("does not sweep when the narrowed pass was already asking every donor it has", async () => {
     // Only two donors answer the checks at all, so narrowing to two takes nothing away and leaves nothing over.
     const answering = [DNS_DONORS[4].value, DNS_DONORS[6].value];
-    donorChecks.checkDonor.mockImplementation(async (donor: string) => ({
-      dnsMs: answering.includes(donor) ? 50 : null,
-      chatgptMs: 300,
-      country: "NL",
-      direct: false
-    }));
+    donorChecks.checkDonor.mockImplementation(async (donor: string) =>
+      answering.includes(donor)
+        ? { dnsMs: 50, chatgptMs: 300, country: "NL", direct: false, reason: null }
+        : { dnsMs: null, chatgptMs: null, country: null, direct: false, reason: null }
+    );
     const pending = heldBatches();
     renderBuilder();
     await uploadBase(manyHosts(120), "big");

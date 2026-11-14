@@ -258,7 +258,7 @@ export function HostsBuilder() {
   const urlId = useId();
   const urlErrorId = useId();
   const fileId = useId();
-  const { check, runChecks, statusOf } = useDonorChecks();
+  const { check, runChecks, statusOf, reachesChatgpt } = useDonorChecks();
   const { donors: kept } = useCustomDonors();
   const { hidden } = useHiddenDonors();
   /** Whether the servers hidden in the monitor are listed here too. They are never ticked by being listed. */
@@ -302,7 +302,8 @@ export function HostsBuilder() {
   // default are the ones the monitor got ChatGPT through, minus the ones hidden there - hiding a server is saying
   // it should be out of the way, and a tick it never asked for would put it back in the run. Any of them can
   // still be ticked by hand once shown.
-  const chosen = (value: string) => picks[value] ?? (!hidden.has(value) && statusOf(value).chatgpt === "ok");
+  const choose = (value: string, reaches: boolean) => picks[value] ?? (!hidden.has(value) && reaches);
+  const chosen = (value: string) => choose(value, statusOf(value).chatgpt === "ok");
   const hiddenHere = listed.filter((donor) => hidden.has(donor.value)).length;
   const offered = listed.filter((donor) => !hidden.has(donor.value));
 
@@ -456,11 +457,17 @@ export function HostsBuilder() {
     // slow network at; cancelling the run still answers at once, because the cancel is raced against them.
     const started = checksRef.current ?? runChecks(extra ? extra.split(" ") : []);
     const checked: CheckedDonor[] = await Promise.race([started, cancellation(signal)]);
-    const latency = new Map(checked.map(({ donor, check }) => [donor, check.dnsMs]));
+    const result = new Map(checked.map(({ donor, check }) => [donor, check]));
+    const latency = (value: string) => result.get(value)?.dnsMs ?? Number.POSITIVE_INFINITY;
+    // Exactly the ticks the list is showing, decided from these results rather than from the rendered state: a run
+    // started while the checks were still out would otherwise see "checking" everywhere and find nobody to ask.
     return listed
       .map(({ value }) => value)
-      .filter((value) => picks[value] ?? (latency.get(value) !== null && latency.get(value) !== undefined))
-      .sort((a, b) => (latency.get(a) ?? Number.POSITIVE_INFINITY) - (latency.get(b) ?? Number.POSITIVE_INFINITY))
+      .filter((value) => {
+        const check = result.get(value);
+        return check !== undefined && choose(value, reachesChatgpt(check));
+      })
+      .sort((a, b) => latency(a) - latency(b))
       .slice(0, MAX_DONORS);
   }
 

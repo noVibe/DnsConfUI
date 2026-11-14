@@ -68,12 +68,26 @@ export function useDonorChecks() {
     };
   }, []);
 
+  /**
+   * Whether chatgpt.com opened through this donor: the question the table's second column answers.
+   *
+   * Taken as a function of one finished check so that a caller holding fresh results - the hosts panel, deciding
+   * what a run should ask - gets the same answer the table is showing, instead of a second rule of its own.
+   */
+  const reachesChatgpt = useCallback(
+    (check: DonorCheck) => {
+      // Without a proxy, chatgpt.com sees the visitor's own country, so the blocked-country rule applies to it.
+      const country = check.direct ? visitor : check.country;
+      return !(check.direct && country && BLOCKED_COUNTRIES.has(country)) && check.chatgptMs !== null;
+    },
+    [visitor]
+  );
+
   function statusOf(donor: string) {
     const check = checks[donor];
     const direct = check?.direct ?? false;
-    // Without a proxy, chatgpt.com sees the visitor's own country, so the blocked-country rule applies to it.
     const country = direct ? visitor : check?.country ?? null;
-    const chatgptMs = check ? (direct && country && BLOCKED_COUNTRIES.has(country) ? null : check.chatgptMs) : undefined;
+    const chatgptMs = check ? (reachesChatgpt(check) ? check.chatgptMs : null) : undefined;
     const dns = toStatus(check?.dnsMs);
     const chatgpt = toStatus(chatgptMs);
     const dnsKey = { checking: "profiles.donorCheckDnsChecking", ok: "profiles.donorCheckDnsOk", fail: "profiles.donorCheckDnsFail" } as const;
@@ -102,7 +116,7 @@ export function useDonorChecks() {
     };
   }
 
-  return { check, runChecks, statusOf };
+  return { check, runChecks, statusOf, reachesChatgpt };
 }
 
 export type DonorStatus = ReturnType<ReturnType<typeof useDonorChecks>["statusOf"]>;
