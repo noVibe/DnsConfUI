@@ -45,6 +45,16 @@ export function Tooltip({ text, className }: { text: string; className?: string 
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
+  // A box placed against the window does not travel with the page, so scrolling away from the icon closes it
+  // rather than leaving it hanging where the icon used to be. That happens when the icon is reached by keyboard:
+  // a pointer leaving it closes the box by itself.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    return () => window.removeEventListener("scroll", close, true);
+  }, [open]);
+
   // Before paint, so the box is never seen at the corner it was rendered in on its way to where it belongs.
   useLayoutEffect(() => {
     if (!open) return;
