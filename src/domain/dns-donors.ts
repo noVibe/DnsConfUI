@@ -12,7 +12,9 @@ export const DNS_DONORS: readonly DnsDonor[] = [
   { label: "WLRUS", value: "https://dns.wlrus.cfd/dns-query", site: "https://site.dns.wlrus.cfd" },
   { label: "Malw", value: "https://dns.malw.link/dns-query", site: "https://info.dns.malw.link" },
   { label: "Dagami", value: "https://dns.dagami.ru/dns-query", site: "https://dns.dagami.ru" },
-  { label: "DNS-AI", value: "https://dns.dns-ai.ru/dns-query", site: "https://dns-ai.ru" }
+  { label: "DNS-AI", value: "https://dns.dns-ai.ru/dns-query", site: "https://dns-ai.ru" },
+  // The DoH template its setup page gives; dns.webshiftvpn.ru is the page itself, not the resolver.
+  { label: "WebShift", value: "https://d.webshiftvpn.ru/dns-query", site: "https://dns.webshiftvpn.ru" }
 ];
 
 export const DEFAULT_DNS_DONOR = DNS_DONORS[0].value;
