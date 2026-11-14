@@ -749,7 +749,10 @@ export function HostsBuilder() {
               onChange={(event) => {
                 if (isHostsSourceKey(event.target.value)) setSourceKey(event.target.value);
               }}
-              className={cn(inputClass, "h-8 min-h-0 w-48 py-0 text-xs")}
+              // The size has to be forced for this one control: the stylesheet gives form elements `font: inherit`
+              // outside any layer, and an unlayered rule beats a utility, so a plain `text-xs` is ignored here.
+              // Done on this select alone - the same rule is what every other control in the app is drawn at.
+              className={cn(inputClass, "h-8 min-h-0 w-48 py-0 text-xs!")}
             >
               {HOSTS_SOURCES.map((source) => (
                 <option key={source.key} value={source.key}>
