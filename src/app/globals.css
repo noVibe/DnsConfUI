@@ -56,9 +56,9 @@ body {
   border-color: color-mix(in srgb, #d4a853 25%, transparent) !important;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+/*
+  Tailwind's own preflight already gives form controls `font: inherit`, and it does it inside `@layer base`, where
+  a `text-xs` on the element still wins. The same rule written here sat outside every layer, and unlayered styles
+  beat layered ones - so every button, input and select ignored its font-size class and rendered at the inherited
+  16px, which is why they looked oversized next to their own labels.
+*/
