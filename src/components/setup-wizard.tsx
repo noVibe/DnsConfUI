@@ -11,7 +11,7 @@ import {
   retainedCredentialsConfigSchema,
   type DnsConfConfig
 } from "@/domain/dnsconf-config";
-import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS } from "@/domain/toggles";
+import { GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, OISD_SMALL_BLOCK_LIST } from "@/domain/toggles";
 import { configureNextDNSProfile, validateCredentials } from "@/lib/nextdns/api";
 import {
   createGitHubRequest,
@@ -180,8 +180,7 @@ export function SetupWizard() {
     const hasGeoHide = config.redirects.includes(GEOHIDE_HOSTS_LIST);
     const hasMalw = config.redirects.includes(MALW_HOSTS_LIST);
     const hasNextDns = config.profiles.some((profile) => profile.provider === "nextdns");
-    const hasCloudflareBlocklist = [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS]
-      .some((url) => config.blocklists.includes(url));
+    const hasCloudflareBlocklist = config.blocklists.includes(OISD_SMALL_BLOCK_LIST);
 
     form.reset(config);
     setMode("quick");
@@ -588,10 +587,9 @@ export function buildQuickDnsConfConfig({
   blockAds: boolean;
   retainCredentials: boolean;
 }): DnsConfConfig {
-  const cloudflareBlocklists = [OISD_SMALL_BLOCK_SUBDOMAINS, OISD_SMALL_BLOCK_DOMAINS];
   const canEditBlockAds = !retainCredentials || profiles.every((profile) => profile.provider === "cloudflare");
   const blocklists = retainCredentials
-    ? existingBlocklists.filter((url) => !canEditBlockAds || !cloudflareBlocklists.includes(url))
+    ? existingBlocklists.filter((url) => !canEditBlockAds || url !== OISD_SMALL_BLOCK_LIST)
     : [];
   const redirects = retainCredentials && geoBlock
     ? existingRedirects.filter((url) => url !== GEOHIDE_HOSTS_LIST && url !== MALW_HOSTS_LIST)
@@ -600,9 +598,7 @@ export function buildQuickDnsConfConfig({
   if (geoBlock && geoHideChecked) redirects.push(GEOHIDE_HOSTS_LIST);
   if (geoBlock && malwChecked) redirects.push(MALW_HOSTS_LIST);
   if (blockAds && profiles.some((profile) => profile.provider === "cloudflare")) {
-    cloudflareBlocklists.forEach((url) => {
-      if (!blocklists.includes(url)) blocklists.push(url);
-    });
+    if (!blocklists.includes(OISD_SMALL_BLOCK_LIST)) blocklists.push(OISD_SMALL_BLOCK_LIST);
   }
 
   return {
