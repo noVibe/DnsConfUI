@@ -25,6 +25,7 @@ export function QuickModeUI({
   geoHideChecked,
   malwChecked,
   customRedirects = [],
+  compress,
   blockAds,
   disguisedTrackers,
   nativeTracking,
@@ -61,6 +62,7 @@ export function QuickModeUI({
   geoHideChecked: boolean;
   malwChecked: boolean;
   customRedirects?: string[];
+  compress: boolean;
   blockAds: boolean;
   disguisedTrackers: boolean;
   nativeTracking: boolean;
@@ -166,6 +168,15 @@ export function QuickModeUI({
                   />
                 ))}
               </div>
+            ) : null}
+
+            {hasNextDns ? (
+              <ToggleSwitch
+                checked={compress}
+                onChange={(checked) => setValue("compress", checked, { shouldDirty: true })}
+                label={t('compress.label')}
+                tooltip={t('compress.tooltip')}
+              />
             ) : null}
 
             {!retainCredentials || !hasNextDns ? (

@@ -6,12 +6,15 @@ import { useLocale } from "@/lib/i18n/context";
 import { Field, textareaClass } from "@/components/ui";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SourceListInput } from "./source-list-input";
+import { ToggleSwitch } from "./toggle-switch";
 import { parseExcludeDomains } from "./utils";
 
 export function SourcesSection({
   blocklists,
   redirects,
   redirectExclusions,
+  compress,
+  showCompress,
   setValue,
   blocklistsError,
   redirectsError,
@@ -20,6 +23,8 @@ export function SourcesSection({
   blocklists: string[];
   redirects: string[];
   redirectExclusions: string[];
+  compress: boolean;
+  showCompress: boolean;
   setValue: UseFormSetValue<DnsConfConfig>;
   blocklistsError?: string;
   redirectsError?: string;
@@ -40,6 +45,16 @@ export function SourcesSection({
           placeholder={t('sources.redirectPlaceholder')}
           error={redirectsError}
         />
+        {showCompress ? (
+          <div className="mt-3">
+            <ToggleSwitch
+              checked={compress}
+              onChange={(checked) => setValue("compress", checked, { shouldDirty: true })}
+              label={t('compress.label')}
+              tooltip={t('compress.tooltip')}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="rounded-lg border border-line bg-white p-4">
         <div className="mb-3 font-semibold text-ink">{t('sources.block')}</div>

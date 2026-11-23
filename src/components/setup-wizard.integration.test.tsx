@@ -35,7 +35,8 @@ describe("SetupWizard retained navigation", () => {
         profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
         blocklists: [],
         redirects: [GEOHIDE_HOSTS_LIST],
-        redirectExclusions: []
+        redirectExclusions: [],
+        compress: true
       },
       variableEnvironment: "dns"
     });
@@ -84,7 +85,8 @@ describe("SetupWizard retained navigation", () => {
         profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: DEFAULT_DNS_DONOR }],
         blocklists: [],
         redirects: [GEOHIDE_HOSTS_LIST, MALW_HOSTS_LIST, customRedirect],
-        redirectExclusions: []
+        redirectExclusions: [],
+        compress: true
       },
       variableEnvironment: "dns"
     });
@@ -151,7 +153,8 @@ describe("SetupWizard retained navigation", () => {
         profiles: [{ clientId: "", authSecret: "", provider: "nextdns", donorDns: "" }],
         blocklists: [],
         redirects: [],
-        redirectExclusions: []
+        redirectExclusions: [],
+        compress: true
       },
       variableEnvironment: "dns"
     });

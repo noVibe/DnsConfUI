@@ -10,7 +10,8 @@ const validConfig = {
   profiles: [{ clientId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6", authSecret: "secret-token", provider: "cloudflare" as const, donorDns: DEFAULT_DNS_DONOR }],
   blocklists: ["https://example.com/block.txt", "https://filters.test/list"],
   redirects: ["https://example.com/redirect-hosts.txt"],
-  redirectExclusions: ["keep.example"]
+  redirectExclusions: ["keep.example"],
+  compress: true
 };
 
 describe("dnsConfConfigSchema", () => {
@@ -152,11 +153,13 @@ describe("dnsConfConfigSchema", () => {
   it("accepts domain exclusions and rejects URL exclusions", () => {
     expect(dnsConfConfigSchema.safeParse({
       ...validConfig,
-      redirectExclusions: ["example.com", "sub.example.com"]
+      redirectExclusions: ["example.com", "sub.example.com"],
+      compress: true
     }).success).toBe(true);
     expect(dnsConfConfigSchema.safeParse({
       ...validConfig,
-      redirectExclusions: ["https://example.com"]
+      redirectExclusions: ["https://example.com"],
+      compress: true
     }).success).toBe(false);
   });
 });
@@ -174,7 +177,8 @@ describe("buildDnsConfPayload", () => {
       DONOR_DNS: DEFAULT_DNS_DONOR,
       BLOCK: "https://example.com/block.txt,https://filters.test/list",
       REDIRECT: "https://example.com/redirect-hosts.txt",
-      EXCLUDE_REDIRECT: "keep.example"
+      EXCLUDE_REDIRECT: "keep.example",
+      COMPRESS: "TRUE"
     });
   });
 
@@ -229,7 +233,8 @@ describe("buildDnsConfPayload", () => {
       ...validConfig,
       blocklists: ["https://block.a", "https://block.b", "https://block.c"],
       redirects: ["https://redir.a", "https://redir.b"],
-      redirectExclusions: ["ex.a", "ex.b", "ex.c"]
+      redirectExclusions: ["ex.a", "ex.b", "ex.c"],
+      compress: true
     });
 
     expect(payload.variables.BLOCK).toBe("https://block.a,https://block.b,https://block.c");
@@ -249,5 +254,12 @@ describe("buildDnsConfPayload", () => {
     expect(payload.secrets).toEqual({});
     expect(payload.variables.DNS).toBe("nextdns,cloudflare");
     expect(payload.variables.DONOR_DNS).toBe(`-,${DEFAULT_DNS_DONOR}`);
+  });
+});
+
+describe("COMPRESS payload", () => {
+  it("defaults to TRUE and writes FALSE when switched off", () => {
+    expect(buildDnsConfPayload({ ...validConfig, compress: undefined as unknown as boolean }).variables.COMPRESS).toBe("TRUE");
+    expect(buildDnsConfPayload({ ...validConfig, compress: false }).variables.COMPRESS).toBe("FALSE");
   });
 });
