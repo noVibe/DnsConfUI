@@ -1,0 +1,101 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check types
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build standalone bundle
+        env:
+          NEXT_PUBLIC_GITHUB_CLIENT_ID: ${{ vars.NEXT_PUBLIC_GITHUB_CLIENT_ID || secrets.NEXT_PUBLIC_GITHUB_CLIENT_ID }}
+        run: |
+          if [ -z "$NEXT_PUBLIC_GITHUB_CLIENT_ID" ]; then
+            echo "Set NEXT_PUBLIC_GITHUB_CLIENT_ID in repository Variables or Secrets." >&2
+            exit 1
+          fi
+          npm run build
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then
+            cp -r public .next/standalone/public
+          fi
+          tar -czf release.tar.gz -C .next/standalone .
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_USER: ${{ secrets.VPS_USER || 'app' }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          RELEASE_ID: ${{ github.run_number }}-${{ github.sha }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
+            echo "Set VPS_HOST and VPS_SSH_KEY in repository Secrets." >&2
+            exit 1
+          fi
+
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key"
+
+          SSH_OPTS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+          REMOTE_ARCHIVE="/tmp/dnsconf-${RELEASE_ID}.tar.gz"
+
+          scp "${SSH_OPTS[@]}" -P "$VPS_PORT" release.tar.gz "${VPS_USER}@${VPS_HOST}:${REMOTE_ARCHIVE}"
+
+          ssh "${SSH_OPTS[@]}" -p "$VPS_PORT" "${VPS_USER}@${VPS_HOST}" "bash -s" -- "$RELEASE_ID" "$REMOTE_ARCHIVE" <<'EOF'
+          set -euo pipefail
+          RELEASE_ID="$1"
+          REMOTE_ARCHIVE="$2"
+          APP_DIR="/var/www/dnsconf"
+          RELEASE_DIR="${APP_DIR}/releases/${RELEASE_ID}"
+
+          mkdir -p "$RELEASE_DIR"
+          tar -xzf "$REMOTE_ARCHIVE" -C "$RELEASE_DIR"
+          rm -f "$REMOTE_ARCHIVE"
+
+          ln -sfn "$RELEASE_DIR" "${APP_DIR}/current"
+          sudo /usr/bin/systemctl restart dnsconf
+
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              echo "Healthcheck passed."
+              ls -1dt "${APP_DIR}"/releases/* | tail -n +4 | xargs -r rm -rf
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Healthcheck failed. Inspect logs with: journalctl -u dnsconf -n 50" >&2
+          exit 1
+          EOF

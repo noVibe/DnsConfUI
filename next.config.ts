@@ -42,6 +42,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   allowedDevOrigins: isDev ? getLocalOrigins() : undefined,
   async headers() {
     return [
