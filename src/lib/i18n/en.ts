@@ -145,6 +145,8 @@ export const locale = {
   "script.oneType": "If only one source type is provided, the other remains unchanged.",
   "script.excludeRedirect": "EXCLUDE_REDIRECT domains affect both existing and new redirect rules.",
   "script.rateLimit": "NextDNS API rate limiter: 60 seconds between requests.",
+  "compress.label": "Enable hosts compression",
+  "compress.tooltip": "NextDNS allows at most 500 rewrites. Hosts entries are deduplicated and collapsed to second/third-level domains, since NextDNS routes subdomains automatically.",
   "script.previousData": "Previously generated data is always removed.",
   "script.clearCF": "To clear Cloudflare settings, launch without providing sources.",
   "script.eachLineCF": "Each line is mapped to an IP address–domain pair; lines that cannot be parsed are skipped.",

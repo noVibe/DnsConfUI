@@ -6,7 +6,8 @@ export const DNSCONF_VARIABLE_NAMES = [
   "DONOR_DNS",
   "BLOCK",
   "REDIRECT",
-  "EXCLUDE_REDIRECT"
+  "EXCLUDE_REDIRECT",
+  "COMPRESS"
 ] as const;
 
 export type DnsConfVariableName = typeof DNSCONF_VARIABLE_NAMES[number];
@@ -30,7 +31,9 @@ export function configFromDnsConfVariables(variables: DnsConfVariables): DnsConf
     profiles,
     blocklists: splitSourceValues(variables.BLOCK),
     redirects: splitSourceValues(variables.REDIRECT),
-    redirectExclusions: splitSourceValues(variables.EXCLUDE_REDIRECT)
+    redirectExclusions: splitSourceValues(variables.EXCLUDE_REDIRECT),
+    // Compression stays on unless COMPRESS is explicitly FALSE, including when it is missing.
+    compress: variables.COMPRESS?.trim().toUpperCase() !== "FALSE"
   };
 }
 

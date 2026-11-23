@@ -11,7 +11,8 @@ const setup = {
     profiles: [{ clientId: "", authSecret: "", provider: "nextdns" as const, donorDns: DEFAULT_DNS_DONOR }],
     blocklists: [],
     redirects: [],
-    redirectExclusions: []
+    redirectExclusions: [],
+    compress: true
   }
 };
 

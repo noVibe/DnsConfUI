@@ -16,7 +16,8 @@ describe("configFromDnsConfVariables", () => {
       ],
       blocklists: ["https://example.com/block-a", "https://example.com/block-b"],
       redirects: ["https://example.com/redirect"],
-      redirectExclusions: ["keep.example", "another.example"]
+      redirectExclusions: ["keep.example", "another.example"],
+      compress: true
     });
   });
 
@@ -61,5 +62,17 @@ describe("configFromDnsConfVariables", () => {
   it("rejects missing or unsupported DNS provider values", () => {
     expect(configFromDnsConfVariables({})).toBeNull();
     expect(configFromDnsConfVariables({ DNS: "cloudflare,unknown" })).toBeNull();
+  });
+});
+
+describe("COMPRESS variable", () => {
+  it("keeps compression on when COMPRESS is missing", () => {
+    expect(configFromDnsConfVariables({ DNS: "nextdns" })?.compress).toBe(true);
+  });
+
+  it("turns compression off only for an explicit FALSE", () => {
+    expect(configFromDnsConfVariables({ DNS: "nextdns", COMPRESS: "FALSE" })?.compress).toBe(false);
+    expect(configFromDnsConfVariables({ DNS: "nextdns", COMPRESS: " false " })?.compress).toBe(false);
+    expect(configFromDnsConfVariables({ DNS: "nextdns", COMPRESS: "TRUE" })?.compress).toBe(true);
   });
 });

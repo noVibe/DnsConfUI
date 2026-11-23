@@ -48,7 +48,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "https://dns.geohide.ru:444/dns-query", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "https://dns.geohide.ru:444/dns-query", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret
@@ -137,7 +137,8 @@ describe("provisionDnsConfRepository", () => {
           DONOR_DNS: "-",
           BLOCK: "https://example.test/block",
           REDIRECT: "https://example.test/redirect",
-          EXCLUDE_REDIRECT: "example.test"
+          EXCLUDE_REDIRECT: "example.test",
+          COMPRESS: "TRUE"
         }
       },
       request,
@@ -186,7 +187,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -230,7 +231,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -265,7 +266,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -317,7 +318,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -375,7 +376,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "cloudflare", DONOR_DNS: "-", BLOCK: "https://example.com/list", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`
@@ -415,7 +416,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" },
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`,
@@ -441,7 +442,7 @@ describe("provisionDnsConfRepository", () => {
     workflowFileName: "github_action.yml",
     payload: {
       secrets: {},
-      variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+      variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" },
     },
     retainCredentials: true,
   };
@@ -500,7 +501,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" },
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`,
@@ -556,7 +557,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" },
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`,
@@ -582,7 +583,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" },
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" },
       },
       request,
       encryptSecret: async (value) => `encrypted:${value}`,
@@ -615,7 +616,7 @@ describe("provisionDnsConfRepository", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: {},
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret,
@@ -836,7 +837,7 @@ describe("dispatched workflow run", () => {
       workflowFileName: "github_action.yml",
       payload: {
         secrets: { CLIENT_ID: "client", AUTH_SECRET: "secret" },
-        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "https://example.com/hosts", EXCLUDE_REDIRECT: "" }
+        variables: { DNS: "nextdns", DONOR_DNS: "-", BLOCK: "", REDIRECT: "https://example.com/hosts", EXCLUDE_REDIRECT: "", COMPRESS: "TRUE" }
       },
       request,
       encryptSecret: async (value: string) => `encrypted:${value}`

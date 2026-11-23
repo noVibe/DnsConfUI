@@ -319,6 +319,7 @@ export function SetupWizard() {
         existingBlocklists: values.blocklists ?? [],
         existingRedirects: values.redirects ?? [],
         existingRedirectExclusions: values.redirectExclusions ?? [],
+        compress: values.compress ?? true,
         geoBlock,
         geoHideChecked,
         malwChecked,
@@ -478,6 +479,8 @@ export function SetupWizard() {
               blocklists={values.blocklists}
               redirects={values.redirects}
               redirectExclusions={values.redirectExclusions}
+              compress={values.compress ?? true}
+              showCompress={(values.profiles ?? []).some((profile) => profile.provider === "nextdns")}
               setValue={form.setValue}
               blocklistsError={fieldError(parsed, "blocklists")}
               redirectsError={fieldError(parsed, "redirects")}
@@ -535,6 +538,7 @@ export function SetupWizard() {
             geoHideChecked={geoHideChecked}
             malwChecked={malwChecked}
             customRedirects={retainedCustomRedirects}
+            compress={values.compress ?? true}
             blockAds={blockAds}
             disguisedTrackers={disguisedTrackers}
             nativeTracking={nativeTracking}
@@ -571,6 +575,7 @@ export function buildQuickDnsConfConfig({
   existingBlocklists,
   existingRedirects,
   existingRedirectExclusions,
+  compress = true,
   geoBlock,
   geoHideChecked,
   malwChecked,
@@ -581,6 +586,7 @@ export function buildQuickDnsConfConfig({
   existingBlocklists: string[];
   existingRedirects: string[];
   existingRedirectExclusions: string[];
+  compress?: boolean;
   geoBlock: boolean;
   geoHideChecked: boolean;
   malwChecked: boolean;
@@ -605,6 +611,7 @@ export function buildQuickDnsConfConfig({
     profiles,
     blocklists,
     redirects,
-    redirectExclusions: retainCredentials ? existingRedirectExclusions : []
+    redirectExclusions: retainCredentials ? existingRedirectExclusions : [],
+    compress
   };
 }

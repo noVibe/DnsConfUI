@@ -7,7 +7,8 @@ const dnsProviderSchema = z.enum(["cloudflare", "nextdns"]);
 const sourceConfigFields = {
   blocklists: z.array(z.string().trim().url("Enter a valid URL")).default([]),
   redirects: z.array(z.string().trim().url("Enter a valid URL")).default([]),
-  redirectExclusions: z.array(z.string().trim().min(1, "Enter a domain name").refine(v => !v.includes("://"), "Use a domain name, not a URL")).default([])
+  redirectExclusions: z.array(z.string().trim().min(1, "Enter a domain name").refine(v => !v.includes("://"), "Use a domain name, not a URL")).default([]),
+  compress: z.boolean().default(true)
 };
 
 export const profileSchema = z.object({
@@ -55,14 +56,15 @@ export type Profile = z.infer<typeof profileSchema>;
 
 export type DnsConfPayload = {
   secrets: Partial<Record<"CLIENT_ID" | "AUTH_SECRET", string>>;
-  variables: Record<"DNS" | "BLOCK" | "REDIRECT" | "EXCLUDE_REDIRECT" | "DONOR_DNS", string>;
+  variables: Record<"DNS" | "BLOCK" | "REDIRECT" | "EXCLUDE_REDIRECT" | "DONOR_DNS" | "COMPRESS", string>;
 };
 
 export const defaultDnsConfConfig: DnsConfConfig = {
   profiles: [{ clientId: "", authSecret: "", provider: "", donorDns: DEFAULT_DNS_DONOR }],
   blocklists: [],
   redirects: [],
-  redirectExclusions: []
+  redirectExclusions: [],
+  compress: true
 };
 
 export function buildDnsConfPayload(
@@ -83,7 +85,8 @@ export function buildDnsConfPayload(
       DONOR_DNS: parsed.profiles.map(p => p.donorDns || DISABLED_DNS_DONOR).join(","),
       BLOCK: parsed.blocklists.join(","),
       REDIRECT: parsed.redirects.join(","),
-      EXCLUDE_REDIRECT: parsed.redirectExclusions.join(",")
+      EXCLUDE_REDIRECT: parsed.redirectExclusions.join(","),
+      COMPRESS: parsed.compress ? "TRUE" : "FALSE"
     }
   };
 }

@@ -26,6 +26,7 @@ function renderQuickMode(overrides: Partial<ComponentProps<typeof QuickModeUI>> 
     geoBlock: false,
     geoHideChecked: true,
     malwChecked: true,
+    compress: true,
     blockAds: true,
     disguisedTrackers: true,
     nativeTracking: true,

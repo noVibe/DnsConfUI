@@ -141,7 +141,8 @@ describe("normalizeValues", () => {
       profiles: [],
       blocklists: ["https://a.com/list", "https://b.com/list"],
       redirects: [],
-      redirectExclusions: []
+      redirectExclusions: [],
+      compress: true
     });
     expect(result.blocklists).toEqual(["https://a.com/list", "https://b.com/list"]);
   });
@@ -151,7 +152,8 @@ describe("normalizeValues", () => {
       profiles: [],
       blocklists: [],
       redirects: ["https://a.com/redir", "https://b.com/redir"],
-      redirectExclusions: []
+      redirectExclusions: [],
+      compress: true
     });
     expect(result.redirects).toEqual(["https://a.com/redir", "https://b.com/redir"]);
   });
@@ -161,7 +163,8 @@ describe("normalizeValues", () => {
       profiles: [],
       blocklists: [],
       redirects: [],
-      redirectExclusions: ["ex.a", "ex.b"]
+      redirectExclusions: ["ex.a", "ex.b"],
+      compress: true
     });
     expect(result.redirectExclusions).toEqual(["ex.a", "ex.b"]);
   });
@@ -171,7 +174,8 @@ describe("normalizeValues", () => {
       profiles: [],
       blocklists: [],
       redirects: [],
-      redirectExclusions: []
+      redirectExclusions: [],
+      compress: true
     });
     expect(result.blocklists).toEqual([]);
     expect(result.redirects).toEqual([]);
@@ -184,7 +188,8 @@ describe("normalizeValues", () => {
       profiles,
       blocklists: [],
       redirects: [],
-      redirectExclusions: []
+      redirectExclusions: [],
+      compress: true
     });
     expect(result.profiles).toBe(profiles);
   });
