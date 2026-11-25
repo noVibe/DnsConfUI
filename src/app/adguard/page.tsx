@@ -19,7 +19,7 @@ export default function AdGuardPage() {
               <button
                 type="button"
                 onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1.5 text-sm! font-medium! text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
               >
                 <Globe className="size-3.5" aria-hidden="true" />
                 {locale === "ru" ? "English" : "Русский"}
@@ -27,14 +27,14 @@ export default function AdGuardPage() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1.5 text-sm! font-medium! text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
               >
                 {theme === "light" ? <Moon className="size-3.5" aria-hidden="true" /> : <Sun className="size-3.5" aria-hidden="true" />}
                 {theme === "light" ? t("home.theme.dark") : t("home.theme.light")}
               </button>
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-moss/40 bg-moss/15 px-2.5 py-1.5 text-sm! font-medium! text-moss transition-colors hover:border-moss hover:bg-moss/20 hover:text-ink dark:border-moss/45 dark:bg-mint dark:text-ink/85 dark:hover:border-moss dark:hover:text-ink"
               >
                 <ArrowLeft className="size-3.5" aria-hidden="true" />
                 {t("adguard.backHome")}
