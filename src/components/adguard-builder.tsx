@@ -272,11 +272,11 @@ export function AdGuardBuilder() {
         {/* Collapsible live preview */}
         <details
           onToggle={(event) => setPreviewOpen(event.currentTarget.open)}
-          className="group mt-4 border-t border-line pt-3"
+          className="group/preview mt-4 border-t border-line pt-3"
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-medium text-ink/70">
             <span>{t("adguard.previewToggle")}</span>
-            <ChevronDown className="size-3.5 text-ink/40 transition group-open:rotate-180" aria-hidden="true" />
+            <ChevronDown className="size-3.5 text-ink/40 transition group-open/preview:rotate-180" aria-hidden="true" />
           </summary>
           <div className="mt-2.5">
             {previewState.kind === "loading" ? (
@@ -388,10 +388,10 @@ export function AdGuardBuilder() {
       </section>
 
       {/* Collapsible fine-tuning options */}
-      <details className="group rounded-lg border border-line bg-white p-4 shadow-soft md:p-6">
+      <details className="group/options rounded-lg border border-line bg-white p-4 shadow-soft md:p-6">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-ink">
           <span>{t("adguard.optionsTitle")}</span>
-          <ChevronDown className="size-4 text-moss transition group-open:rotate-180" aria-hidden="true" />
+          <ChevronDown className="size-4 text-moss transition group-open/options:rotate-180" aria-hidden="true" />
         </summary>
 
         <div className="mt-4 space-y-5">
