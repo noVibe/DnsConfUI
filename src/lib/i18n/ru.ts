@@ -244,7 +244,7 @@ export const locale: Record<LocaleKey, string> = {
   "adguard.homeBannerTitle": "Используете AdGuard?",
   "adguard.homeBannerDesc": "Готовая динамическая ссылка с правилами $dnsrewrite для Android, iOS, Windows, macOS и AdGuard Home — без аккаунта GitHub.",
   "adguard.homeBannerCta": "Открыть списки AdGuard",
-  "adguard.backHome": "NextDNS / Cloudflare",
+  "adguard.backHome": "На главную",
   "adguard.title": "Динамические списки для AdGuard",
   "adguard.subtitle": "Выберите DNS-донор и вставьте HTTPS-ссылку в приложение AdGuard или на роутер. Правила обновляются автоматически в фоне в формате $dnsrewrite с компрессией поддоменов.",
   "adguard.chooseDonor": "Выберите DNS-донор",

@@ -15,11 +15,11 @@ export default function AdGuardPage() {
       <section className="mx-auto grid w-full max-w-7xl gap-6 px-5 py-6 md:grid-cols-[0.62fr_1.38fr] md:px-8 md:py-8">
         <div className="flex flex-col gap-5">
           <div className="rounded-lg border border-moss/30 bg-mint/70 p-4 shadow-sm dark:bg-paper">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
-                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
               >
                 <Globe className="size-3.5" aria-hidden="true" />
                 {locale === "ru" ? "English" : "Русский"}
@@ -27,14 +27,14 @@ export default function AdGuardPage() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
               >
                 {theme === "light" ? <Moon className="size-3.5" aria-hidden="true" /> : <Sun className="size-3.5" aria-hidden="true" />}
                 {theme === "light" ? t("home.theme.dark") : t("home.theme.light")}
               </button>
               <Link
                 href="/"
-                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-white px-2.5 py-1 text-xs font-medium text-ink/60 transition-colors hover:border-ink/30 hover:text-ink"
               >
                 <ArrowLeft className="size-3.5" aria-hidden="true" />
                 {t("adguard.backHome")}

@@ -242,7 +242,7 @@ export const locale = {
   "adguard.homeBannerTitle": "Using AdGuard?",
   "adguard.homeBannerDesc": "Get a dynamic $dnsrewrite filter link for Android, iOS, Windows, macOS or AdGuard Home — no GitHub account required.",
   "adguard.homeBannerCta": "Open AdGuard lists",
-  "adguard.backHome": "NextDNS / Cloudflare",
+  "adguard.backHome": "Home",
   "adguard.title": "Dynamic AdGuard filter lists",
   "adguard.subtitle": "Pick a DNS donor and paste the HTTPS link into your AdGuard app or router. Rules are updated automatically in the background and use $dnsrewrite with subdomain compression.",
   "adguard.chooseDonor": "Choose DNS donor",
