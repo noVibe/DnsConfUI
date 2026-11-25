@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeAQuery, isPublicAddress, parseARecords, parseTrace, resolveA } from "./doh";
+import { encodeAQuery, isPublicAddress, parseARecordResponse, parseARecords, parseTrace, resolveA, resolveBatchA } from "./doh";
 
 function answer(type: number, data: number[]) {
   // Name as a compression pointer to the question at offset 12, class IN, TTL 60.
@@ -32,6 +32,14 @@ describe("parseARecords", () => {
 
   it("rejects DNS error codes", () => {
     expect(() => parseARecords(response([], 3))).toThrow("DNS error code 3");
+  });
+
+  it("exposes RCODE in parseARecordResponse so batch lookups treat NXDOMAIN distinctly from malformed packets", () => {
+    expect(parseARecordResponse(response([answer(1, [1, 2, 3, 4])], 0))).toEqual({ rcode: 0, addresses: ["1.2.3.4"] });
+    expect(parseARecordResponse(response([], 3))).toEqual({ rcode: 3, addresses: [] });
+    expect(parseARecordResponse(response([], 2))).toEqual({ rcode: 2, addresses: [] });
+    // Query packet (QR=0) is rejected as invalid response.
+    expect(() => parseARecordResponse(encodeAQuery("chatgpt.com"))).toThrow("Invalid DNS response");
   });
 
   it("rejects truncated and non-DNS payloads instead of looping", () => {
@@ -74,5 +82,21 @@ describe("resolveA", () => {
     await expect(resolveA("https://127.0.0.1/dns-query", "chatgpt.com", 1000)).rejects.toThrow("not public");
     await expect(resolveA("https://[::1]/dns-query", "chatgpt.com", 1000)).rejects.toThrow("not public");
     await expect(resolveA("https://localhost/dns-query", "chatgpt.com", 1000)).rejects.toThrow("non-public");
+  });
+});
+
+describe("resolveBatchA", () => {
+  it("returns empty results for an empty domain list", async () => {
+    const result = await resolveBatchA("https://1.1.1.1/dns-query", []);
+    expect(result.records.size).toBe(0);
+    expect(result.succeeded).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(result.aborted).toBe(false);
+  });
+
+  it("refuses DoH servers on non-public addresses before resolving", async () => {
+    await expect(resolveBatchA("https://127.0.0.1/dns-query", ["chatgpt.com"])).rejects.toThrow("not public");
+    await expect(resolveBatchA("https://[::1]/dns-query", ["chatgpt.com"])).rejects.toThrow("not public");
+    await expect(resolveBatchA("https://localhost/dns-query", ["chatgpt.com"])).rejects.toThrow("non-public");
   });
 });

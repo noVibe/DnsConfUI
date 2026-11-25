@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, Globe, Layers, MapPin, RefreshCw, ShieldCheck, GitFork, Play, Zap, Sun, Moon } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, ChevronDown, Globe, Layers, MapPin, RefreshCw, Shield, ShieldCheck, GitFork, Play, Zap, Sun, Moon } from "lucide-react";
 import { DeviceAuthPanel } from "@/components/device-auth-panel";
 import { DnsMonitor } from "@/components/dns-monitor";
 import { SetupWizard } from "@/components/setup-wizard";
@@ -130,6 +131,23 @@ export default function Home() {
               </div>
             ) : null}
           </details>
+
+          <div className="rounded-lg border border-moss/30 bg-mint/50 p-4 shadow-sm dark:bg-paper">
+            <div className="flex items-start gap-3">
+              <Shield className="mt-0.5 size-4 shrink-0 text-moss" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold text-ink">{t("adguard.homeBannerTitle")}</div>
+                <p className="mt-1 text-xs leading-5 text-ink/70">{t("adguard.homeBannerDesc")}</p>
+                <Link
+                  href="/adguard"
+                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-steel hover:text-steel"
+                >
+                  {t("adguard.homeBannerCta")}
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+          </div>
 
           <div className="flex items-center gap-2 text-xs text-ink/40">
             <span>GitHub:</span>
