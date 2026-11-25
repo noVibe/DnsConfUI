@@ -79,6 +79,10 @@ jobs:
           REMOTE_ARCHIVE="$2"
           APP_DIR="/var/www/dnsconf"
           RELEASE_DIR="${APP_DIR}/releases/${RELEASE_ID}"
+          PREV_RELEASE=""
+          if [ -L "${APP_DIR}/current" ]; then
+            PREV_RELEASE="$(readlink -f "${APP_DIR}/current" || true)"
+          fi
 
           mkdir -p "$RELEASE_DIR"
           tar -xzf "$REMOTE_ARCHIVE" -C "$RELEASE_DIR"
@@ -97,5 +101,10 @@ jobs:
           done
 
           echo "Healthcheck failed. Inspect logs with: journalctl -u dnsconf -n 50" >&2
+          if [ -n "$PREV_RELEASE" ] && [ -d "$PREV_RELEASE" ] && [ "$PREV_RELEASE" != "$RELEASE_DIR" ]; then
+            echo "Rolling back to ${PREV_RELEASE}..." >&2
+            ln -sfn "$PREV_RELEASE" "${APP_DIR}/current"
+            sudo /usr/bin/systemctl restart dnsconf || true
+          fi
           exit 1
           EOF
